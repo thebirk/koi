@@ -1,0 +1,172 @@
+!(123 * -32 % !12) + 123 != 12 && true || 1 == 2
+
+var global_item_id_counter = 0;
+
+fn varargs(args...) {
+    // args is an array
+}
+
+fn Item(name, id, stackable) {
+    global_item_id_counter += 1;
+    return {
+        name = name,
+        id = global_item_id_counter,
+        stackable = stackable,
+
+        append_dmg_increase = fn(self, dmg) {
+            self.dmg += dmg;
+        },
+    };
+}
+
+var Items = [
+    Item("Coins", true),
+    Item("Iron Ingot", false),
+];
+
+fn main() {
+    for a in range(0, 10) {
+        println("a: ", a);
+    }
+
+    var a; // Default value is null
+    var iter = range(0, 10);
+    var i = next(iter);
+    while i != null {
+        println("i: ", i);
+        i = next(iter);
+    }
+}
+
+/*
+
+GC steps
+1. Start the mark phase
+    Go through all elements, and mark them white
+2. Marking
+    Push all root elements(global variables, variables) aka anything we can acess atm. to the grey list
+    2.1 The work    
+        Take a grey element, add all its children to the grey list, add parent element to black list
+        If we add any new elements at this moment, mark them grey
+3. Sweeping
+    When the grey list is empty, free all objects that are still white
+
+---------------------------
+
+Code:
+fn some_func() {
+    for a in range(0, 10) {
+        println("a: ", a);
+    }
+}
+
+Locals: 2
+Constants:
+0 - Number 10
+1 - Number 0
+2 - String "a: "
+3 - Ident: range
+4 - Ident: next
+5 - Ident: println
+6 - Ident: iter_empty
+
+Opcodes:
+    PUSHK 0
+    PUSHK 1
+    PUSHK 3
+    GETGLOBAL
+    CALL
+    SETLOCAL 0 ; range-iterator
+for.iter:
+    GETLOCAL 0
+    PUSHK 6
+    GETGLOBAL
+    CALL
+    IFT for.end ; if true branch
+    GETLOCAL 0
+    PUSHK 4
+    GETGLOBAL
+    CALL
+    SETLOCAL 1 ; a
+
+for.body
+    GETLOCAL 1
+    PSUHK 2
+    PUSHK 5
+    GETGLOBAL
+    CALL
+    POP ; unused return value
+    JMP fot.iter
+for.end
+
+Would be nice with file info opcodes like
+FILE k ; Path to current file
+LINE k ; Push line number
+
+
+--------------
+
+Code:
+func some_func() {
+    var a = 123;
+    var b = 321;
+    var c = a + b * 32;
+}
+
+Locals: 3
+
+Constants:
+0 - 123
+1 - 321
+2 - 32
+
+Opcodes
+    PUSHK 0
+    SETLOCAL 0
+    PUSHK 1
+    SETLOCAL 1
+    PUSHK 2
+    GETLOCAL 1
+    MUL
+    GETLOCAL 0
+    ADD
+    SETLOCAL 2
+    RET
+    RET ; Double ret?
+    
+-------------
+
+Function :: struct {
+    using val: Value,
+    constants: []^Value, // Max 256?
+    num_locals: int,     // Max 256, 0-255
+    code: []Opcode,
+}
+
+vm_run(state, func) {
+    
+}
+
+==================
+
+Opcode list
+PUSHK
+SETLOCAL
+GETLOCAL
+GETGLOBAL
+SETGLOBAL
+ADD
+SUB
+MUL
+DIV
+MOD
+UNARY
+NOT
+EQ
+NEQ
+LT
+LTE
+GT
+GTE
+
+*/
