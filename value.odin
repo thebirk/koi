@@ -20,22 +20,22 @@ Value :: struct {
 	kind: typeid,
 }
 
-Null :: struct { using _: Value }
-True :: struct { using _: Value }
-False :: struct { using _: Value }
+Null :: struct { using base: Value }
+True :: struct { using base: Value }
+False :: struct { using base: Value }
 
 Number :: struct {
-	using _: Value,
+	using base: Value,
 	value: f64,
 }
 
 String :: struct {
-	using _: Value,
+	using base: Value,
 	str: string,
 }
 
 Function :: struct {
-	using _: Value,
+	using base: Value,
 	loc: Location,
 	stack_size: int, // This should be more than enough?
 	arg_count: int,
@@ -46,18 +46,18 @@ Function :: struct {
 
 KoiFunction :: struct {
 	using func: ^Function,
-	ops: [dynamic]u8,
+	ops: [dynamic]Opcode,
 	constants: [dynamic]^Value, // Shared by references unlike the stack.
 	locals: int,
 }
 
 Array :: struct {
-	using _: Value,
+	using base: Value,
 	data: arraylist.ArrayList(^Value),
 }
 
 Table :: struct {
-	using _: Value,
+	using base: Value,
 	data: map[string]^Value,
 }
 

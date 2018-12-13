@@ -1,0 +1,4 @@
+fn main() {
+	var a = 123 + 321;
+	return a;
+}

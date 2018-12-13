@@ -1,5 +1,6 @@
 package koi
 
+import "core:fmt"
 import "core:strings"
 
 scope_get :: proc(scope: ^Scope, name: string) -> (Variable, bool) {
@@ -38,15 +39,15 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		}
 
 		if v.is_local {
-			append(&f.ops, u8(GETLOCAL));
-			append(&f.ops, u8(v.local_index));
+			append(&f.ops, Opcode(GETLOCAL));
+			append(&f.ops, Opcode(v.local_index));
 		} else {
 			for k, i in f.constants {
 				if is_string(k) {
 					s := cast(^String) k;
 					if s.str == v.name {
-						append(&f.ops, u8(PUSHK));
-						append(&f.ops, u8(i));
+						append(&f.ops, Opcode(PUSHK));
+						append(&f.ops, Opcode(i));
 						return;
 					}
 				}
@@ -58,18 +59,19 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 			assert(k >= 0 && k <= 255, "Too many constants");
 
-			append(&f.ops, u8(PUSHK));
-			append(&f.ops, u8(k));
+			append(&f.ops, Opcode(PUSHK));
+			append(&f.ops, Opcode(k));
 		}
 	case NodeNumber:
 		s := new_value(state, Number);
 		s.value = n.value;
 		k := len(f.constants);
+		append(&f.constants, s);
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
-		append(&f.ops, u8(PUSHK));
-		append(&f.ops, u8(k));
+		append(&f.ops, Opcode(PUSHK));
+		append(&f.ops, Opcode(k));
 	case NodeString:
 		s := new_value(state, String);
 		s.str = strings.new_string(n.value);
@@ -77,25 +79,25 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
-		append(&f.ops, u8(PUSHK));
-		append(&f.ops, u8(k));
+		append(&f.ops, Opcode(PUSHK));
+		append(&f.ops, Opcode(k));
 	case NodeNull:
-		append(&f.ops, u8(PUSHNULL));
+		append(&f.ops, Opcode(PUSHNULL));
 	case NodeTrue:
-		append(&f.ops, u8(PUSHTRUE));
+		append(&f.ops, Opcode(PUSHTRUE));
 	case NodeFalse:
-		append(&f.ops, u8(PUSHFALSE));
+		append(&f.ops, Opcode(PUSHFALSE));
 	case NodeBinary:
 		gen_expr(state, scope, f, n.rhs);
 		gen_expr(state, scope, f, n.lhs);
 
 		using TokenType;
 		switch n.op {
-		case Plus: append(&f.ops, u8(ADD));
-		case Minus: append(&f.ops, u8(SUB));
-		case Asterisk: append(&f.ops, u8(MUL));
-		case Slash: append(&f.ops, u8(DIV));
-		case Mod: append(&f.ops, u8(MOD));
+		case Plus: append(&f.ops, Opcode(ADD));
+		case Minus: append(&f.ops, Opcode(SUB));
+		case Asterisk: append(&f.ops, Opcode(MUL));
+		case Slash: append(&f.ops, Opcode(DIV));
+		case Mod: append(&f.ops, Opcode(MOD));
 		case: panic("Unexpected binary op!");
 		}
 	case NodeUnary:
@@ -116,7 +118,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	switch n in node.kind {
 	case NodeReturn:
 		gen_expr(state, scope, f, n.expr);
-		append(&f.ops, u8(RETURN));
+		append(&f.ops, Opcode(RETURN));
 	case NodeVariableDecl:
 		index := f.locals;
 		ok := scope_add_local(scope, n.name, index);
@@ -127,12 +129,12 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		if n.expr != nil {
 			gen_expr(state, scope, f, n.expr);
-			append(&f.ops, u8(SETLOCAL));
-			append(&f.ops, u8(index));
+			append(&f.ops, Opcode(SETLOCAL));
+			append(&f.ops, Opcode(index));
 		} else {
-			append(&f.ops, u8(PUSHNULL));
-			append(&f.ops, u8(SETLOCAL));
-			append(&f.ops, u8(index));
+			append(&f.ops, Opcode(PUSHNULL));
+			append(&f.ops, Opcode(SETLOCAL));
+			append(&f.ops, Opcode(index));
 		}
 	case NodeCall:
 		panic("TODO");
@@ -160,8 +162,9 @@ gen_block :: proc(state: ^State, parent_scope: ^Scope, f: ^KoiFunction, node: ^N
 
 gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Function {
 	fv := new_value(state, Function);
-	fv.variant = KoiFunction{};
-	f := &fv.variant.(KoiFunction);
+	fv.variant = KoiFunction{func=fv};
+	f := &(fv.variant.(KoiFunction));
+	f.stack_size = 100; //TODO: Do some proper stack size stuff
 
 	scope := make_scope(parent_scope);
 	f.arg_count = len(n.args);
@@ -173,8 +176,8 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	gen_block(state, scope, f, n.block);
 
 	// Return something
-	append(&f.ops, u8(Opcode.PUSHNULL));
-	append(&f.ops, u8(Opcode.RETURN));
+	append(&f.ops, Opcode(Opcode.PUSHNULL));
+	append(&f.ops, Opcode(Opcode.RETURN));
 
 	return fv;
 }

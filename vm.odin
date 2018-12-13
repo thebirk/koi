@@ -31,14 +31,17 @@ add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-call_function :: proc(state: ^State, func: ^Function, args: []^Value) {
+call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
 	sf := push_call(state, func);
+	result: ^Value = nil;
 	#complete switch f in func.variant {
 	case KoiFunction:
-		exec_koi_function(state, cast(^KoiFunction)func, sf, args);
+		result = exec_koi_function(state, cast(^KoiFunction) &func.variant, sf, args);
 	}
 
 	pop_call(state);
+
+	return result;
 }
 
 exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, args: []^Value) -> ^Value {
@@ -50,15 +53,23 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		state.stack[sp] = v; sp += 1;
 	}
 
-	for {
+
+	vm_loop: for {
 		op := Opcode(func.ops[pc]);
 		pc += 1;
+
 		
 		using Opcode;
 		switch op {
 		case POP:
 			assert(sp > sf.bottom);
 			sp -= 1;
+		case PUSHNULL:
+			state.stack[sp] = state.null_value; sp += 1;
+		case PUSHTRUE:
+			state.stack[sp] = state.true_value; sp += 1;
+		case PUSHFALSE:
+			state.stack[sp] = state.false_value; sp += 1;
 		case PUSHK:
 			k := func.ops[pc]; pc += 1;
 			state.stack[sp] = func.constants[k]; sp += 1;
@@ -98,13 +109,14 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		case LT: panic("Opcode not implemented");
 		case LTE: panic("Opcode not implemented");
 		case RETURN:
-			break; // Is it this easy?
+			break vm_loop; // Is it this easy?
 
 		case:
-			fmt.panicf("Invalid opcode: %x", op);
+			fmt.panicf("Invalid opcode: %v", op);
 		}
 	}
 
 	// What do we return? Element at the top of the stack, otherwise nil?
-	return nil;
+	// Assumes opcode is wellformed and always returns something
+	return state.stack[sp-1];
 }

@@ -12,6 +12,7 @@ Variable :: struct {
 	name: string,
 	is_local: bool,
 	local_index: int,
+	value: ^Value,
 }
 
 Scope :: struct {
@@ -53,23 +54,28 @@ State :: struct {
 make_state :: proc() -> ^State {
 	state := new(State);
 	state.global_scope = new(Scope);
-/*	state.null_value = new_value(state, Null);
+	state.null_value = new_value(state, Null);
 	state.true_value = new_value(state, True);
 	state.false_value = new_value(state, False);
-*/
+
 	return state;
 }
 
 state_ensure_stack_size :: proc(using state: ^State) {
-	if len(stack) < top {
+	fmt.printf("len(stack): %v, top: %v\n", len(stack), top);
+	if top >= len(stack) {
+		len := len(stack);
 		reserve(&stack, top);
+		for i in len..top-1 {
+			append(&stack, nil);
+		}
 	}
 }
 
 push_call :: proc(state: ^State, func: ^Function) -> StackFrame {
 	bottom := state.top;
 	state.top += func.stack_size + func.arg_count;
-	sf := StackFrame{func = func, prev_stack_top = bottom, bottom = state.top};
+	sf := StackFrame{func = func, prev_stack_top = state.top, bottom = bottom};
 	append(&state.call_stack, sf);
 	state_ensure_stack_size(state);
 	return sf;
@@ -80,15 +86,23 @@ pop_call :: proc(using state: ^State) {
 	top = sf.prev_stack_top;
 }
 
+state_add_global :: proc(using state: ^State, name: string, v: ^Value) -> bool {
+	if _, ok := state.global_scope.names[name]; ok {
+		return false;
+	}
+
+	state.global_scope.names[name] = Variable{value = v, name = name};
+	return true;
+}
+
 main :: proc() {
-	state := make_state();
 
 	//nodes, err := parse_file("test.koi");
 /*	parser: Parser;
 	init_parser(&parser, "test.koi");
 	fmt.printf("%#v\n", parse_expr(&parser).kind);*/
 
-	nodes, err := parse_file("test2.koi");
+	nodes, err := parse_file("test_gen.koi");
 	nodes[0].loc = get_builtin_loc();
 	for n in nodes {
 		fmt.printf("%#v\n", n.kind);
@@ -99,4 +113,45 @@ main :: proc() {
 		fmt.printf("%#v\n", t);
 		t = next_token(&parser);
 	}*/
+
+	state := make_state();
+	for i in 0..len(nodes)-1 {
+		node := nodes[i];
+		switch n in node.kind {
+		case NodeVariableDecl:
+			//HOW
+			panic("TODO");
+		case NodeFn:
+			f := gen_function(state, state.global_scope, cast(^NodeFn) node);
+			fmt.printf("f: %#v\n", f.variant);
+			fmt.printf("f.ops:\n%#v\n", f.variant.(KoiFunction).ops);
+			if !state_add_global(state, n.name, f) {
+				panic("Name already exists");
+			}
+		case: panic("Unexpected top-level node type!");	
+		}
+	}
+
+	main_v, ok := scope_get(state.global_scope, "main");
+	if !ok {
+		panic("No main");
+	}
+	main := main_v.value;
+
+	args: [dynamic]^Value;
+	ret := call_function(state, cast(^Function) main, args[:]);
+	fmt.printf("ret: %#v\n", ret^);
+	fmt.printf("stack:\n");
+	for v in state.stack[0:10] {
+		if v == nil {
+			fmt.printf("nil\n");
+		} else {
+			switch v.kind {
+			case Number:
+				fmt.printf("%#v\n", (cast(^Number)v)^);
+			case:
+				fmt.printf("%#v\n", v);
+			}
+		}
+	}
 }
