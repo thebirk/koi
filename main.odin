@@ -62,7 +62,6 @@ make_state :: proc() -> ^State {
 }
 
 state_ensure_stack_size :: proc(using state: ^State) {
-	fmt.printf("len(stack): %v, top: %v\n", len(stack), top);
 	if top >= len(stack) {
 		len := len(stack);
 		reserve(&stack, top);
@@ -74,7 +73,7 @@ state_ensure_stack_size :: proc(using state: ^State) {
 
 push_call :: proc(state: ^State, func: ^Function) -> StackFrame {
 	bottom := state.top;
-	state.top += func.stack_size + func.arg_count;
+	state.top += func.stack_size + func.locals;
 	sf := StackFrame{func = func, prev_stack_top = state.top, bottom = bottom};
 	append(&state.call_stack, sf);
 	state_ensure_stack_size(state);
@@ -103,10 +102,10 @@ main :: proc() {
 	fmt.printf("%#v\n", parse_expr(&parser).kind);*/
 
 	nodes, err := parse_file("test_gen.koi");
-	nodes[0].loc = get_builtin_loc();
+	/*nodes[0].loc = get_builtin_loc();
 	for n in nodes {
 		fmt.printf("%#v\n", n.kind);
-	}
+	}*/
 	/*
 	t := next_token(&parser);
 	for t.kind != TokenType.Eof {
@@ -128,8 +127,8 @@ main :: proc() {
 			panic("TODO");
 		case NodeFn:
 			f := gen_function(state, state.global_scope, cast(^NodeFn) node);
-			fmt.printf("f: %#v\n", f.variant);
-			fmt.printf("f.ops:\n%#v\n", f.variant.(KoiFunction).ops);
+			//fmt.printf("f: %#v\n", f.variant);
+			//fmt.printf("f.ops:\n%#v\n", f.variant.(KoiFunction).ops);
 			if !state_add_global(state, n.name, f) {
 				panic("Name already exists");
 			}
@@ -144,19 +143,29 @@ main :: proc() {
 	main := main_v.value;
 
 	args: [dynamic]^Value;
+	a1 := new_value(state, Number);
+	a1.value = 111;
+	append(&args, a1);
 	ret := call_function(state, cast(^Function) main, args[:]);
-	fmt.printf("ret: %#v\n", ret^);
-	fmt.printf("stack (size: %d):\n", (cast(^Function)main).stack_size);
-	for v in state.stack {
-		if v == nil {
-			fmt.printf("nil\n");
-		} else {
-			switch v.kind {
-			case Number:
-				fmt.printf("%#v\n", (cast(^Number)v)^);
-			case:
-				fmt.printf("%#v\n", v);
-			}
+	fmt.printf("\n\nRETURN: ");
+	switch ret.kind {
+		case Number:
+			fmt.printf("%#v\n", (cast(^Number)ret)^);
+		case:
+			fmt.printf("%#v\n", ret);
 		}
 	}
+	// fmt.printf("stack (size: %d):\n", (cast(^Function)main).stack_size);
+	// for v in state.stack {
+	// 	if v == nil {
+	// 		fmt.printf("nil\n");
+	// 	} else {
+	// 		switch v.kind {
+	// 		case Number:
+	// 			fmt.printf("%#v\n", (cast(^Number)v)^);
+	// 		case:
+	// 			fmt.printf("%#v\n", v);
+	// 		}
+	// 	}
+	// }
 }

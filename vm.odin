@@ -49,16 +49,19 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 	sp := sf.bottom;
 	args_buffer: [dynamic]^Value;
 
+	assert(len(args) == func.arg_count);
+
 	for v in args {
 		state.stack[sp] = v; sp += 1;
 	}
 
+	for i in 0..func.locals-len(args)-1 {
+		sp += 1;
+	}
 
 	vm_loop: for {
 		op := Opcode(func.ops[pc]);
 		pc += 1;
-
-		fmt.printf("stack size: %d, sp: %d\n", func.stack_size, sp-sf.bottom);
 
 		using Opcode;
 		switch op {
@@ -93,6 +96,9 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		case MUL: panic("Opcode not implemented");
 		case DIV: panic("Opcode not implemented");
 		case MOD: panic("Opcode not implemented");
+		case EQ: panic("Opcode not implemented");
+		case LT: panic("Opcode not implemented");
+		case LTE: panic("Opcode not implemented");
 		case CALL:
 			// Assuming varargs is passed as table
 			sp -= 1; f := state.stack[sp];
@@ -106,14 +112,41 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			a1 := u16(func.ops[pc]); pc += 1;
 			a2 := u16(func.ops[pc]); pc += 1;
 			pc += int(transmute(i16) (a1 << 8 | a2));
-		case EQ: panic("Opcode not implemented");
-		case LT: panic("Opcode not implemented");
-		case LTE: panic("Opcode not implemented");
 		case RETURN:
 			break vm_loop; // Is it this easy?
 
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
+		}
+	}
+
+	if true {
+		fmt.printf("locals(%d):\n", func.locals);
+		for v in state.stack[sf.bottom:func.locals] {
+			if v == nil {
+				fmt.printf("nil\n");
+			} else {
+				switch v.kind {
+				case Number:
+					fmt.printf("%#v\n", (cast(^Number)v)^);
+				case:
+					fmt.printf("%#v\n", v);
+				}
+			}
+		}
+
+		fmt.printf("stack (%d):\n", func.stack_size);
+		for v in state.stack[sf.bottom+func.locals:sf.bottom+func.locals+func.stack_size] {
+			if v == nil {
+				fmt.printf("nil\n");
+			} else {
+				switch v.kind {
+				case Number:
+					fmt.printf("%#v\n", (cast(^Number)v)^);
+				case:
+					fmt.printf("%#v\n", v);
+				}
+			}
 		}
 	}
 

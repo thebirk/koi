@@ -39,6 +39,7 @@ Function :: struct {
 	loc: Location,
 	stack_size: int, // This should be more than enough?
 	arg_count: int,
+	locals: int,
 	variant: union {
 		KoiFunction,
 	},
@@ -48,7 +49,6 @@ KoiFunction :: struct {
 	using func: ^Function,
 	ops: [dynamic]Opcode,
 	constants: [dynamic]^Value, // Shared by references unlike the stack.
-	locals: int,
 	current_stack: int,
 }
 
