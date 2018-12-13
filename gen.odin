@@ -22,7 +22,7 @@ scope_add_local :: proc(scope: ^Scope, name: string, index: int) -> bool {
 	v := Variable{
 		name = name,
 		is_local = true,
-		index = index,
+		local_index = index,
 	};
 	scope.names[name] = v;
 	return true;
@@ -113,13 +113,13 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	using Opcode;
-	switch n in node {
+	switch n in node.kind {
 	case NodeReturn:
 		gen_expr(state, scope, f, n.expr);
 		append(&f.ops, u8(RETURN));
 	case NodeVariableDecl:
 		index := f.locals;
-		ok := scope_add_local(state, n.name, index);
+		ok := scope_add_local(scope, n.name, index);
 		if !ok {
 			panic("Variable already exists!");
 		}
@@ -136,21 +136,24 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		}
 	case NodeCall:
 		panic("TODO");
-	case NodeAssignment: panic("TODO");
-	case NodeIf: panic("TODO");
-	case NodeFor: panic("TODO");
+	case NodeAssignment:
+		panic("TODO");
+	case NodeIf:
+		panic("TODO");
+	case NodeFor:
+		panic("TODO");
 	case NodeBlock:
-		gen_block(state, scope, f, n);
+		gen_block(state, scope, f, node);
 		
 	case: panic("Unexpected stmt node type!");
 	}
 }
 
-gen_block :: proc(state: ^State, parent_scope: ^Scope, f: ^KoiFunction, node: ^NodeBlock) {
-	assert(node.kind == NodeBlock);
+gen_block :: proc(state: ^State, parent_scope: ^Scope, f: ^KoiFunction, node: ^Node) {
+	n := &node.kind.(NodeBlock);
 	scope := make_scope(parent_scope);
 
-	for stmt in node.stmts {
+	for stmt in n.stmts {
 		gen_stmt(state, scope, f, stmt);
 	}
 }
@@ -167,11 +170,11 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 		f.locals += 1;
 	}
 
-	gen_block(state, scope, n.block);
+	gen_block(state, scope, f, n.block);
 
 	// Return something
-	append(&f.ops, Opcode.PUSHNULL);
-	append(&f.ops, Opcode.RETURN);
+	append(&f.ops, u8(Opcode.PUSHNULL));
+	append(&f.ops, u8(Opcode.RETURN));
 
 	return fv;
 }
