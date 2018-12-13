@@ -506,9 +506,25 @@ parse_block :: proc(using parser: ^Parser) -> ^Node {
 	return make_block(parser, loc, stmts);
 }
 
+parse_import :: proc(using parser: ^Parser) -> ^Node {
+	loc := current_token;
+	assert(loc.kind == TokenType.Import);
+	next_token(parser);
+
+	name := current_token;
+	if name.kind != TokenType.String {
+		parser_error(parser, "Expected string after 'import', got '%s'", name.lexeme);
+	}
+	next_token(parser);
+
+	return make_import(parser, loc, name);
+}
+
 parse_top_level :: proc(using parser: ^Parser) -> ^Node {
 	using TokenType;
 	switch current_token.kind {
+	case Import:
+		return parse_import(parser);
 	case Var:
 		return parse_var(parser);
 	case Fn:

@@ -1,8 +1,11 @@
+// import "other_file.koi" as other
+
 fn main() {
 	var a = 123 + 321;
 	{
 		var c = 12;
 	}
+
 	var b = 444;
 	return a+b;
 }

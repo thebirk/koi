@@ -118,8 +118,13 @@ main :: proc() {
 	for i in 0..len(nodes)-1 {
 		node := nodes[i];
 		switch n in node.kind {
+		case NodeImport:
+			//TODO
 		case NodeVariableDecl:
 			//HOW
+			// Create a dummy function and generate all the variable decls into here
+			// call it, but it needs to be called before we gen functions
+			// We should first add all references to all top-level nodes then generate them
 			panic("TODO");
 		case NodeFn:
 			f := gen_function(state, state.global_scope, cast(^NodeFn) node);

@@ -110,6 +110,11 @@ NodeReturn :: struct {
 	expr: ^Node,
 }
 
+NodeImport :: struct {
+	using node: Node,
+	name: string,
+}
+
 new_node :: proc(parser: ^Parser, $T: typeid) -> ^T {
 	n := new(T);
 	n.kind = n^;
@@ -224,6 +229,13 @@ make_return :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeReturn {
 	n.loc = t.loc;
 	n.expr = expr;
 	return n;
+}
+
+make_import :: proc(parser: ^Parser, t: Token, name: Token) -> ^NodeImport {
+	n := new_node(parser, NodeImport);
+	n.loc = t.loc;
+	n.name = strings.new_string(name.lexeme);
+	return n;	
 }
 
 make_null :: proc(parser: ^Parser, t: Token) -> ^NodeNull {

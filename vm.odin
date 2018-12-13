@@ -58,7 +58,8 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		op := Opcode(func.ops[pc]);
 		pc += 1;
 
-		
+		fmt.printf("stack size: %d, sp: %d\n", func.stack_size, sp-sf.bottom);
+
 		using Opcode;
 		switch op {
 		case POP:

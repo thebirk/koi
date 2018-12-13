@@ -110,9 +110,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHFALSE));
 	case NodeBinary:
-		push_func_stack(f);
 		gen_expr(state, scope, f, n.rhs);
-		push_func_stack(f);
 		gen_expr(state, scope, f, n.lhs);
 
 		using TokenType;
@@ -124,6 +122,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		case Mod: append(&f.ops, Opcode(MOD));
 		case: panic("Unexpected binary op!");
 		}
+		push_func_stack(f);
 		pop_func_stack(f);
 		pop_func_stack(f);
 	case NodeUnary:
