@@ -49,6 +49,7 @@ KoiFunction :: struct {
 	ops: [dynamic]Opcode,
 	constants: [dynamic]^Value, // Shared by references unlike the stack.
 	locals: int,
+	current_stack: int,
 }
 
 Array :: struct {

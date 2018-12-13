@@ -1,4 +1,8 @@
 fn main() {
 	var a = 123 + 321;
-	return a;
+	{
+		var c = 12;
+	}
+	var b = 444;
+	return a+b;
 }

@@ -7,12 +7,15 @@ scope_get :: proc(scope: ^Scope, name: string) -> (Variable, bool) {
 	if v, ok := scope.names[name]; ok {
 		return v, true;
 	}
-	v, ok := scope_get(scope.parent, name);
-	if ok {
-		return v, true;
-	} else {
-		return {}, false;
+	
+	if scope.parent != nil {
+		v, ok := scope_get(scope.parent, name);
+		if ok {
+			return v, true;
+		}
 	}
+
+	return {}, false;
 }
 
 scope_add_local :: proc(scope: ^Scope, name: string, index: int) -> bool {
@@ -29,16 +32,28 @@ scope_add_local :: proc(scope: ^Scope, name: string, index: int) -> bool {
 	return true;
 }
 
+push_func_stack :: inline proc(f: ^KoiFunction) {
+	f.current_stack += 1;
+	if f.current_stack > f.stack_size {
+		f.stack_size = f.current_stack;
+	}
+}
+
+pop_func_stack :: inline proc(f: ^KoiFunction) {
+	f.current_stack -= 1;
+}
+
 gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	using Opcode;
 	switch n in node.kind {
 	case NodeIdent:
 		v, found := scope_get(scope, n.name);
 		if !found {
-			panic("TODO: Error");
+			panic("TODO: Error, ident not found");
 		}
 
 		if v.is_local {
+			push_func_stack(f);
 			append(&f.ops, Opcode(GETLOCAL));
 			append(&f.ops, Opcode(v.local_index));
 		} else {
@@ -46,6 +61,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 				if is_string(k) {
 					s := cast(^String) k;
 					if s.str == v.name {
+						push_func_stack(f);
 						append(&f.ops, Opcode(PUSHK));
 						append(&f.ops, Opcode(i));
 						return;
@@ -59,6 +75,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 			assert(k >= 0 && k <= 255, "Too many constants");
 
+			push_func_stack(f);
 			append(&f.ops, Opcode(PUSHK));
 			append(&f.ops, Opcode(k));
 		}
@@ -70,6 +87,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
+		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHK));
 		append(&f.ops, Opcode(k));
 	case NodeString:
@@ -79,16 +97,22 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
+		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHK));
 		append(&f.ops, Opcode(k));
 	case NodeNull:
+		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHNULL));
 	case NodeTrue:
+		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHTRUE));
 	case NodeFalse:
+		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHFALSE));
 	case NodeBinary:
+		push_func_stack(f);
 		gen_expr(state, scope, f, n.rhs);
+		push_func_stack(f);
 		gen_expr(state, scope, f, n.lhs);
 
 		using TokenType;
@@ -100,6 +124,8 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		case Mod: append(&f.ops, Opcode(MOD));
 		case: panic("Unexpected binary op!");
 		}
+		pop_func_stack(f);
+		pop_func_stack(f);
 	case NodeUnary:
 		panic("TODO");
 	case NodeIndex:
@@ -119,6 +145,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeReturn:
 		gen_expr(state, scope, f, n.expr);
 		append(&f.ops, Opcode(RETURN));
+		pop_func_stack(f);
 	case NodeVariableDecl:
 		index := f.locals;
 		ok := scope_add_local(scope, n.name, index);
@@ -129,10 +156,13 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		if n.expr != nil {
 			gen_expr(state, scope, f, n.expr);
+			pop_func_stack(f);
 			append(&f.ops, Opcode(SETLOCAL));
 			append(&f.ops, Opcode(index));
 		} else {
+			push_func_stack(f);
 			append(&f.ops, Opcode(PUSHNULL));
+			pop_func_stack(f);
 			append(&f.ops, Opcode(SETLOCAL));
 			append(&f.ops, Opcode(index));
 		}
@@ -164,7 +194,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	fv := new_value(state, Function);
 	fv.variant = KoiFunction{func=fv};
 	f := &(fv.variant.(KoiFunction));
-	f.stack_size = 100; //TODO: Do some proper stack size stuff
+	f.stack_size = 0;
 
 	scope := make_scope(parent_scope);
 	f.arg_count = len(n.args);
@@ -176,6 +206,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	gen_block(state, scope, f, n.block);
 
 	// Return something
+	push_func_stack(f);
 	append(&f.ops, Opcode(Opcode.PUSHNULL));
 	append(&f.ops, Opcode(Opcode.RETURN));
 

@@ -141,8 +141,8 @@ main :: proc() {
 	args: [dynamic]^Value;
 	ret := call_function(state, cast(^Function) main, args[:]);
 	fmt.printf("ret: %#v\n", ret^);
-	fmt.printf("stack:\n");
-	for v in state.stack[0:10] {
+	fmt.printf("stack (size: %d):\n", (cast(^Function)main).stack_size);
+	for v in state.stack {
 		if v == nil {
 			fmt.printf("nil\n");
 		} else {
