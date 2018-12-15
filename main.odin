@@ -1,6 +1,8 @@
 package koi
 
 import "core:fmt"
+import "core:sync"
+import "core:thread"
 
 // Features we want:
 //  - Easy odin interop
@@ -34,9 +36,18 @@ StackFrame :: struct {
 
 State :: struct {
 	global_scope: ^Scope,
-	
+
+	gc_worker_stop: bool,
+	gc_worker_stop_mutex: sync.Mutex,
 	marking: bool, // We are currently marking, if this is the case all new objects should be grey
+	marking_mutex: sync.Mutex,
+	gc_thread: ^thread.Thread,
+	start_gc_thread: sync.Semaphore,
+
 	all_objects: ^GCObject,
+	grey_list_mutex: sync.Mutex,
+	 // We should only need a mutex for the grey list because thats the only data
+	 // both threads will be touching at the same time.
 	grey_list: ^GCObject,
 	black_list: ^GCObject,
 
@@ -51,6 +62,31 @@ State :: struct {
 	call_stack: [dynamic]StackFrame,
 }
 
+gc_worker_proc :: proc(t: ^thread.Thread) -> int {
+	state := cast(^State) t.data;
+	for {
+		sync.semaphore_wait(&state.start_gc_thread);
+		sync.semaphore_post(&state.start_gc_thread, 0);
+
+		sync.mutex_lock(&state.gc_worker_stop_mutex);
+		if state.gc_worker_stop {
+			sync.mutex_unlock(&state.gc_worker_stop_mutex);
+			return 0;
+		}
+		sync.mutex_unlock(&state.gc_worker_stop_mutex);
+
+		sync.mutex_lock(&state.marking_mutex);
+		if !state.marking {
+			panic("GC thread was started but we are not marking :(");
+		}
+		sync.mutex_unlock(&state.marking_mutex);
+
+		
+	}
+
+	return 0;
+}
+
 make_state :: proc() -> ^State {
 	state := new(State);
 	state.global_scope = new(Scope);
@@ -58,7 +94,29 @@ make_state :: proc() -> ^State {
 	state.true_value = new_value(state, True);
 	state.false_value = new_value(state, False);
 
+	sync.semaphore_init(&state.start_gc_thread);
+	sync.mutex_init(&state.marking_mutex);
+	sync.mutex_init(&state.gc_worker_stop_mutex);
+
+	state.gc_thread = thread.create(gc_worker_proc);
+	state.gc_thread.data = rawptr(state);
+	state.gc_thread.init_context = context;
+	state.gc_thread.use_init_context = true;
+	thread.start(state.gc_thread);
+
 	return state;
+}
+
+delete_state :: proc(state: ^State) {
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	state.gc_worker_stop = true;
+	sync.mutex_unlock(&state.gc_worker_stop_mutex);
+	sync.semaphore_release(&state.start_gc_thread);
+	thread.destroy(state.gc_thread);
+
+	// Free all the values
+	// Free null, true, and false
+	free(state);
 }
 
 state_ensure_stack_size :: proc(using state: ^State) {
@@ -94,6 +152,9 @@ state_add_global :: proc(using state: ^State, name: string, v: ^Value) -> bool {
 	return true;
 }
 
+// Things that aint right
+//   - var test = test; // This should scream at yah
+
 main :: proc() {
 
 	//nodes, err := parse_file("test.koi");
@@ -114,6 +175,9 @@ main :: proc() {
 	}*/
 
 	state := make_state();
+
+	//TODO: Pre-Register names
+
 	for i in 0..len(nodes)-1 {
 		node := nodes[i];
 		switch n in node.kind {
@@ -124,7 +188,7 @@ main :: proc() {
 			// Create a dummy function and generate all the variable decls into here
 			// call it, but it needs to be called before we gen functions
 			// We should first add all references to all top-level nodes then generate them
-			panic("TODO");
+			//panic("TODO");
 		case NodeFn:
 			f := gen_function(state, state.global_scope, cast(^NodeFn) node);
 			//fmt.printf("f: %#v\n", f.variant);
@@ -151,21 +215,15 @@ main :: proc() {
 	switch ret.kind {
 		case Number:
 			fmt.printf("%#v\n", (cast(^Number)ret)^);
+		case True:
+			fmt.printf("%#v\n", (cast(^True)ret)^);
+		case False:
+			fmt.printf("%#v\n", (cast(^False)ret)^);
+		case Null:
+			fmt.printf("%#v\n", (cast(^Null)ret)^);
 		case:
 			fmt.printf("%#v\n", ret);
-		}
 	}
-	// fmt.printf("stack (size: %d):\n", (cast(^Function)main).stack_size);
-	// for v in state.stack {
-	// 	if v == nil {
-	// 		fmt.printf("nil\n");
-	// 	} else {
-	// 		switch v.kind {
-	// 		case Number:
-	// 			fmt.printf("%#v\n", (cast(^Number)v)^);
-	// 		case:
-	// 			fmt.printf("%#v\n", v);
-	// 		}
-	// 	}
-	// }
+
+	delete_state(state);
 }

@@ -1,7 +1,10 @@
 // import "other_file.koi" as other
 
+fn add(a, b) do return a + b;
+
 fn main(arg) {
-	var a = 123 + 321;
+	//var a = 123 + 321;
+	var a = add(123, 321);
 	{
 		var c = 12;
 	}

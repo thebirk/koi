@@ -157,6 +157,14 @@ make_field :: proc(parser: ^Parser, op: Token, expr: ^Node) -> ^NodeField {
 	return n;
 }
 
+make_call :: proc(parser: ^Parser, loc: Token, expr: ^Node, args: [dynamic]^Node) -> ^NodeCall {
+	n := new_node(parser, NodeCall);
+	n.loc = loc.loc;
+	n.expr = expr;
+	n.args = args;
+	return n;
+}
+
 make_binary :: proc(parser: ^Parser, op: Token, lhs, rhs: ^Node) -> ^NodeBinary {
 	n := new_node(parser, NodeBinary);
 	n.loc = op.loc;

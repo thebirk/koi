@@ -2,6 +2,13 @@ package koi
 
 import "core:fmt"
 
+// JMP 0 - would be a nop
+// 1: EQ 1  - next instr + 1 if false
+// 2: PUSHTRUE
+// 3: JMP 1 - next instr + 1
+// 4: PUSHFALSE
+// 5: ...
+
 Opcode :: enum u8 {
 	POP,
 	PUSHK,
@@ -16,6 +23,8 @@ Opcode :: enum u8 {
 	JMP,
 	EQ, LT, LTE,
 	RETURN,
+	NEWTABLE,
+	NEWARRAY,
 }
 
 add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
@@ -63,6 +72,22 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		op := Opcode(func.ops[pc]);
 		pc += 1;
 
+		if false {
+			fmt.printf("stack (%d):\n", func.stack_size);
+			for v in state.stack[sf.bottom+func.locals:sf.bottom+func.locals+func.stack_size] {
+				if v == nil {
+					fmt.printf("nil\n");
+				} else {
+					switch v.kind {
+					case Number:
+						fmt.printf("%#v\n", (cast(^Number)v)^);
+					case:
+						fmt.printf("%#v\n", v);
+					}
+				}
+			}
+		}
+
 		using Opcode;
 		switch op {
 		case POP:
@@ -85,7 +110,13 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			l := func.ops[pc]; pc += 1;
 			sp -= 1; v := state.stack[sp];
 			state.stack[sf.bottom+int(l)] = v;
-		case GETGLOBAL: panic("Opcode not implemented");
+		case GETGLOBAL:
+			sp -= 1; s := state.stack[sp];
+			fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+			name := cast(^String) s;
+
+			v, _ := scope_get(state.global_scope, name.str);
+			state.stack[sp] = v.value; sp += 1;
 		case SETGLOBAL: panic("Opcode not implemented");
 		case ADD:
 			sp -= 1; lhs := state.stack[sp];
@@ -102,12 +133,15 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		case CALL:
 			// Assuming varargs is passed as table
 			sp -= 1; f := state.stack[sp];
+			assert(is_function(f));
 			fun := cast(^Function) f;
 			clear(&args_buffer);
 			for i in 0..fun.arg_count-1 {
 				sp -= 1;
 				append(&args_buffer, state.stack[sp]);
 			}
+			ret := call_function(state, fun, args_buffer[:]);
+			state.stack[sp] = ret; sp += 1;
 		case JMP:
 			a1 := u16(func.ops[pc]); pc += 1;
 			a2 := u16(func.ops[pc]); pc += 1;
@@ -120,7 +154,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		}
 	}
 
-	if true {
+	if false {
 		fmt.printf("locals(%d):\n", func.locals);
 		for v in state.stack[sf.bottom:func.locals] {
 			if v == nil {

@@ -64,6 +64,9 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 						push_func_stack(f);
 						append(&f.ops, Opcode(PUSHK));
 						append(&f.ops, Opcode(i));
+						append(&f.ops, GETGLOBAL);
+						push_func_stack(f);
+						pop_func_stack(f); // GETGLOBAL pops the previuos value of the stack
 						return;
 					}
 				}
@@ -72,12 +75,16 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			s := new_value(state, String);
 			s.str = strings.new_string(n.name);
 			k := len(f.constants);
+			append(&f.constants, s); // Actually add the damn constant
 
 			assert(k >= 0 && k <= 255, "Too many constants");
 
 			push_func_stack(f);
 			append(&f.ops, Opcode(PUSHK));
 			append(&f.ops, Opcode(k));
+			append(&f.ops, GETGLOBAL);
+			push_func_stack(f);
+			pop_func_stack(f); // GETGLOBAL pops the previuos value of the stack
 		}
 	case NodeNumber:
 		s := new_value(state, Number);
@@ -132,10 +139,20 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeField:
 		panic("TODO");
 	case NodeCall:
-		panic("TODO");
+		gen_call(state, scope, f, cast(^NodeCall) node);
 	case:
 		panic("Unexpected node type!");
 	}
+}
+
+gen_call :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^NodeCall) {
+	//TODO: Determine argument order. Should we push in reverse
+	for i := len(node.args)-1; i >= 0; i -= 1 {
+		gen_expr(state, scope, f, node.args[i]);
+	}
+	gen_expr(state, scope, f, node.expr);
+	append(&f.ops, Opcode.CALL);
+	push_func_stack(f); // Return value
 }
 
 gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
@@ -166,11 +183,18 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			append(&f.ops, Opcode(index));
 		}
 	case NodeCall:
-		panic("TODO");
+		gen_call(state, scope, f, cast(^NodeCall) node);
+		pop_func_stack(f);
+		append(&f.ops, POP);
 	case NodeAssignment:
 		panic("TODO");
 	case NodeIf:
-		panic("TODO");
+		gen_expr(state, scope, f, n.cond);
+		append(&f.ops, EQ);
+		append(&f.ops, JMP);
+		true_loc := len(f.ops);
+		append(&f.ops, Opcode(0));
+		
 	case NodeFor:
 		panic("TODO");
 	case NodeBlock:
@@ -208,6 +232,15 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	push_func_stack(f);
 	append(&f.ops, Opcode(Opcode.PUSHNULL));
 	append(&f.ops, Opcode(Opcode.RETURN));
+
+	if false {
+		fmt.printf("func: %s: ops:\n%#v\n", n.name, f.ops);
+		fmt.printf("f.arg_count: %v\n", f.arg_count);
+		fmt.printf("locals:\n");
+		for v in f.constants {
+			fmt.printf("%#v\n", v^);
+		}
+	}
 
 	return fv;
 }

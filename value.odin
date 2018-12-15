@@ -1,5 +1,6 @@
 package koi
 
+import "core:sync"
 import "shared:birk/arraylist"
 
 GCColor :: enum {
@@ -89,7 +90,9 @@ new_value :: proc(state: ^State, $T: typeid) -> ^T {
 }
 
 init_marking_phase :: proc(using state: ^State) {
+	sync.mutex_lock(&state.marking_mutex);
 	marking = true;
+	sync.mutex_unlock(&state.marking_mutex);
 
 	for i in 0..top-1 {
 		v := stack[i];
@@ -99,4 +102,6 @@ init_marking_phase :: proc(using state: ^State) {
 		v.color = GCColor.Grey;
 		state.grey_list = v;
 	}
+
+	sync.semaphore_release(&state.start_gc_thread);
 }
