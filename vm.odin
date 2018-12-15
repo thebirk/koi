@@ -1,6 +1,7 @@
 package koi
 
 import "core:fmt"
+import "core:math"
 
 // JMP 0 - would be a nop
 // 1: EQ 1  - next instr + 1 if false
@@ -27,7 +28,7 @@ Opcode :: enum u8 {
 	NEWARRAY,
 }
 
-add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -39,6 +40,60 @@ add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	panic("Unimplemented!");
 	return nil;
 }
+
+op_sub :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result := new_value(state, Number);
+		result.value = l.value - r.value;
+		return result;
+	}
+
+	panic("Unimplemented!");
+	return nil;
+}
+
+op_mul :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result := new_value(state, Number);
+		result.value = l.value * r.value;
+		return result;
+	}
+
+	panic("Unimplemented!");
+	return nil;
+}
+
+op_div :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result := new_value(state, Number);
+		result.value = l.value / r.value;
+		return result;
+	}
+
+	panic("Unimplemented!");
+	return nil;
+}
+
+op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result := new_value(state, Number);
+		fmt.printf("math.mod(3, 2) = %v\n", math.mod_f64(3, 2));
+		result.value = math.mod(l.value, r.value);
+		return result;
+	}
+
+	panic("Unimplemented!");
+	return nil;
+}
+
 
 call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
 	sf := push_call(state, func);
@@ -53,6 +108,7 @@ call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value 
 	return result;
 }
 
+// Pass this a file scope, instead of have it using state.global_scope?
 exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, args: []^Value) -> ^Value {
 	pc := 0;
 	sp := sf.bottom;
@@ -117,16 +173,40 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 			v, _ := scope_get(state.global_scope, name.str);
 			state.stack[sp] = v.value; sp += 1;
-		case SETGLOBAL: panic("Opcode not implemented");
+		case SETGLOBAL:
+			sp -= 1; s := state.stack[sp];
+			fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+			name := cast(^String) s;
+			v, found := scope_get(state.global_scope, name.str); // Is this really needed?
+			assert(found);
+			sp -= 1; value := state.stack[sp];
+			scope_set(state.global_scope, name.str, value);
 		case ADD:
 			sp -= 1; lhs := state.stack[sp];
 			sp -= 1; rhs := state.stack[sp];
-			r := add(state, lhs, rhs);
+			r := op_add(state, lhs, rhs);
 			state.stack[sp] = r; sp += 1;
-		case SUB: panic("Opcode not implemented");
-		case MUL: panic("Opcode not implemented");
-		case DIV: panic("Opcode not implemented");
-		case MOD: panic("Opcode not implemented");
+		case SUB:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_sub(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
+		case MUL:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_mul(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
+		case DIV:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_div(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
+		case MOD:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_mod(state, lhs, rhs);
+			panic("mod is broken, pls fix|");
+			state.stack[sp] = r; sp += 1;
 		case EQ: panic("Opcode not implemented");
 		case LT: panic("Opcode not implemented");
 		case LTE: panic("Opcode not implemented");

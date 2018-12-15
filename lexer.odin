@@ -324,6 +324,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 					case "else"       : token_type = TokenType.Else;
 					case "true"     : token_type = TokenType.True;
 					case "false"    : token_type = TokenType.False;
+					case "null"     : token_type = TokenType.Null;
 					case "fn"       : token_type = TokenType.Fn;
 					case "import"   : token_type = TokenType.Import;
 					case "return"   : token_type = TokenType.Return;

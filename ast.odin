@@ -185,6 +185,7 @@ make_unary :: proc(parser: ^Parser, op: Token, expr: ^Node) -> ^NodeUnary {
 make_assignment :: proc(parser: ^Parser, op: Token, lhs, rhs: ^Node) -> ^NodeAssignment {
 	n := new_node(parser, NodeAssignment);
 	n.loc = op.loc;
+	n.op = op.kind;
 	n.lhs = lhs;
 	n.rhs = rhs;
 	return n;

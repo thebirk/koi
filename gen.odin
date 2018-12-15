@@ -1,7 +1,21 @@
 package koi
 
+import "core:os"
 import "core:fmt"
 import "core:strings"
+
+gen_error :: proc(node: ^Node, fmt_string: string, args: ..any) -> ! {
+	print_location(node.loc);
+	fmt.printf("\e[91m error: \e[0m");
+	fmt.printf(fmt_string, ..args);
+	fmt.printf("\n");
+
+	//TODO: Print the line, with the line above and below as well
+	//      try using an arrow as well
+	//      Easiest solution would be to tag tokens with the start offset
+
+	os.exit(1);
+}
 
 scope_get :: proc(scope: ^Scope, name: string) -> (Variable, bool) {
 	if v, ok := scope.names[name]; ok {
@@ -16,6 +30,19 @@ scope_get :: proc(scope: ^Scope, name: string) -> (Variable, bool) {
 	}
 
 	return {}, false;
+}
+
+scope_set :: proc(scope: ^Scope, name: string, value: ^Value) {
+	// Assumes the caller knows the variable exists
+	if _, ok := scope.names[name]; ok {
+		v := scope.names[name];
+		v.value = value;
+		scope.names[name] = v;
+	}
+
+	if scope.parent != nil {
+		scope_set(scope, name, value);
+	}
 }
 
 scope_add_local :: proc(scope: ^Scope, name: string, index: int) -> bool {
@@ -172,22 +199,113 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		if n.expr != nil {
 			gen_expr(state, scope, f, n.expr);
-			pop_func_stack(f);
 			append(&f.ops, Opcode(SETLOCAL));
+			pop_func_stack(f);
 			append(&f.ops, Opcode(index));
 		} else {
-			push_func_stack(f);
 			append(&f.ops, Opcode(PUSHNULL));
-			pop_func_stack(f);
+			push_func_stack(f);
 			append(&f.ops, Opcode(SETLOCAL));
+			pop_func_stack(f);
 			append(&f.ops, Opcode(index));
 		}
 	case NodeCall:
 		gen_call(state, scope, f, cast(^NodeCall) node);
-		pop_func_stack(f);
 		append(&f.ops, POP);
+		pop_func_stack(f);
 	case NodeAssignment:
-		panic("TODO");
+		switch lhs in n.lhs.kind {
+		case NodeIdent:
+			v, ok := scope_get(scope, lhs.name);
+			if !ok {
+				gen_error(n.lhs, "undeclared variable '%s'.", lhs.name);
+			}
+
+			switch n.op {
+			case TokenType.Equal:
+				gen_expr(state, scope, f, n.rhs);
+			case TokenType.PlusEqual:
+				gen_expr(state, scope, f, n.lhs);
+				gen_expr(state, scope, f, n.rhs);
+				append(&f.ops, ADD);
+				push_func_stack(f);
+				pop_func_stack(f);
+				pop_func_stack(f);
+			case TokenType.MinusEqual:
+				gen_expr(state, scope, f, n.lhs);
+				gen_expr(state, scope, f, n.rhs);
+				append(&f.ops, SUB);
+				push_func_stack(f);
+				pop_func_stack(f);
+				pop_func_stack(f);
+			case TokenType.AsteriskEqual:
+				gen_expr(state, scope, f, n.lhs);
+				gen_expr(state, scope, f, n.rhs);
+				append(&f.ops, MUL);
+				push_func_stack(f);
+				pop_func_stack(f);
+				pop_func_stack(f);
+			case TokenType.SlashEqual:
+				gen_expr(state, scope, f, n.lhs);
+				gen_expr(state, scope, f, n.rhs);
+				append(&f.ops, DIV);
+				push_func_stack(f);
+				pop_func_stack(f);
+				pop_func_stack(f);
+			case TokenType.ModEqual:
+				gen_expr(state, scope, f, n.lhs);
+				gen_expr(state, scope, f, n.rhs);
+				append(&f.ops, MOD);
+				push_func_stack(f);
+				pop_func_stack(f);
+				pop_func_stack(f);
+			case:
+				fmt.panicf("Invalid assignment op type: %v", n.op);
+			}
+
+			if v.is_local {
+				append(&f.ops, SETLOCAL);
+				pop_func_stack(f);
+				append(&f.ops, Opcode(v.local_index));
+			} else {
+				for k, i in f.constants {
+					if is_string(k) {
+						s := cast(^String) k;
+						if s.str == v.name {
+							push_func_stack(f);
+							append(&f.ops, Opcode(PUSHK));
+							append(&f.ops, Opcode(i));
+							append(&f.ops, SETGLOBAL);
+							pop_func_stack(f);
+							return;
+						}
+					}
+				}
+
+				s := new_value(state, String);
+				s.str = strings.new_string(lhs.name);
+				k := len(f.constants);
+				append(&f.constants, s); // Actually add the damn constant
+
+				push_func_stack(f);
+				append(&f.ops, Opcode(PUSHK));
+				append(&f.ops, Opcode(k));
+				append(&f.ops, SETGLOBAL);
+				pop_func_stack(f);
+			}
+		case NodeIndex:
+			panic("//TODO:");
+		case NodeField:
+			panic("//TODO:");
+		case NodeBinary, NodeUnary:
+			gen_error(n.lhs, "cannot assign to expression.");
+		case NodeNumber, NodeNull, NodeTrue, NodeFalse:
+			gen_error(n.lhs, "cannot assign to literal.");
+		case NodeCall:
+			gen_error(n.lhs, "cannot assign to function call.");
+		case:
+			gen_error(n.lhs, "cannot assign to left hand side.");
+		}
 	case NodeIf:
 		gen_expr(state, scope, f, n.cond);
 		append(&f.ops, EQ);
@@ -229,16 +347,19 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	gen_block(state, scope, f, n.block);
 
 	// Return something
-	push_func_stack(f);
 	append(&f.ops, Opcode(Opcode.PUSHNULL));
+	push_func_stack(f);
 	append(&f.ops, Opcode(Opcode.RETURN));
+	pop_func_stack(f);
 
-	if false {
-		fmt.printf("func: %s: ops:\n%#v\n", n.name, f.ops);
+	if true {
+		fmt.printf("\n\nfunc: %s\nops: %#v\n", n.name, f.ops);
 		fmt.printf("f.arg_count: %v\n", f.arg_count);
-		fmt.printf("locals:\n");
-		for v in f.constants {
-			fmt.printf("%#v\n", v^);
+		fmt.printf("constants(%v):\n", len(f.constants));
+		if false {
+			for v in f.constants {
+				fmt.printf("%#v\n", v^);
+			}
 		}
 	}
 

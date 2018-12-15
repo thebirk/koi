@@ -8,6 +8,9 @@ fn main(arg) {
 	{
 		var c = 12;
 	}
-	var b = 444;
+
+	var b = 444/2;
+	b += 111;
+
 	return a+b+arg;
 }

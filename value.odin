@@ -14,6 +14,9 @@ GCColor :: enum {
 GCObject :: struct {
 	color: GCColor,
 	next: ^GCObject,
+	// Used only by GCObjects in the grey of black list
+	next_list: ^GCObject,
+	prev_list: ^GCObject,
 }
 
 Value :: struct {
@@ -103,5 +106,6 @@ init_marking_phase :: proc(using state: ^State) {
 		state.grey_list = v;
 	}
 
+	// Kick off worker thread
 	sync.semaphore_release(&state.start_gc_thread);
 }

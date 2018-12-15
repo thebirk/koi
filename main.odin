@@ -44,10 +44,11 @@ State :: struct {
 	gc_thread: ^thread.Thread,
 	start_gc_thread: sync.Semaphore,
 
+	// linked list of all allocated data
 	all_objects: ^GCObject,
 	grey_list_mutex: sync.Mutex,
-	 // We should only need a mutex for the grey list because thats the only data
-	 // both threads will be touching at the same time.
+	// We should only need a mutex for the grey list because thats the only data
+	// both threads will be touching at the same time.
 	grey_list: ^GCObject,
 	black_list: ^GCObject,
 
@@ -55,7 +56,6 @@ State :: struct {
 	true_value: ^Value,
 	false_value: ^Value,
 	// stack trace
-	// linked list of all allocated data
 
 	top: int,
 	stack: [dynamic]^Value,
@@ -216,13 +216,13 @@ main :: proc() {
 		case Number:
 			fmt.printf("%#v\n", (cast(^Number)ret)^);
 		case True:
-			fmt.printf("%#v\n", (cast(^True)ret)^);
+			fmt.printf("%#v\n", ret.kind);
 		case False:
-			fmt.printf("%#v\n", (cast(^False)ret)^);
+			fmt.printf("%#v\n", ret.kind);
 		case Null:
-			fmt.printf("%#v\n", (cast(^Null)ret)^);
+			fmt.printf("%#v\n", ret.kind);
 		case:
-			fmt.printf("%#v\n", ret);
+			fmt.printf("%v, %v\n", ret, ret.kind);
 	}
 
 	delete_state(state);
