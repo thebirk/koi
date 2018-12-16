@@ -41,8 +41,12 @@ scope_set :: proc(scope: ^Scope, name: string, value: ^Value) {
 	}
 
 	if scope.parent != nil {
-		scope_set(scope, name, value);
+		scope_set(scope.parent, name, value);
 	}
+}
+
+scope_add :: proc(scope: ^Scope, name: string) {
+	scope.names[name] = Variable{name = name};
 }
 
 scope_add_local :: proc(scope: ^Scope, name: string, index: int) -> bool {
@@ -159,13 +163,26 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		case Asterisk: append(&f.ops, Opcode(MUL));
 		case Slash: append(&f.ops, Opcode(DIV));
 		case Mod: append(&f.ops, Opcode(MOD));
+		case Equals: append(&f.ops, Opcode(EQ));
+		case LessThan: append(&f.ops, Opcode(LT));
+		case LessThanOrEqual: append(&f.ops, Opcode(LTE));
+		case GreaterThan: append(&f.ops, Opcode(GT));
+		case GreaterThanOrEqual: append(&f.ops, Opcode(GTE));
 		case: panic("Unexpected binary op!");
 		}
 		pop_func_stack(f);
 		pop_func_stack(f);
 		push_func_stack(f);
 	case NodeUnary:
-		panic("TODO");
+		switch n.op {
+		case TokenType.Minus:
+			gen_expr(state, scope, f, n.expr);
+			append(&f.ops, UNM);
+		case TokenType.Plus:
+			gen_expr(state, scope, f, n.expr);
+		case:
+			panic("Invalid unary operator!");
+		}
 	case NodeIndex:
 		panic("TODO");
 	case NodeField:
@@ -186,7 +203,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			gen_expr(state, scope, f, e.name);
 			append(&f.ops, SETTABLE); // Set tables restores the table to the top of the stack after use
 			pop_func_stack(f);
-			pop_func_stack(f);
+			//pop_func_stack(f);
 		}
 	case:
 		panic("Unexpected node type!");
@@ -318,7 +335,83 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		case NodeIndex:
 			panic("//TODO:");
 		case NodeField:
-			panic("//TODO:");
+			switch n.op {
+			case TokenType.Equal:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case TokenType.PlusEqual:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs); //GETABLE
+				append(&f.ops, ADD);
+				pop_func_stack(f);
+				pop_func_stack(f);
+				push_func_stack(f);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case TokenType.MinusEqual:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs); //GETABLE
+				append(&f.ops, SUB);
+				pop_func_stack(f);
+				pop_func_stack(f);
+				push_func_stack(f);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case TokenType.AsteriskEqual:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs); //GETABLE
+				append(&f.ops, MUL);
+				pop_func_stack(f);
+				pop_func_stack(f);
+				push_func_stack(f);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case TokenType.SlashEqual:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs); //GETABLE
+				append(&f.ops, DIV);
+				pop_func_stack(f);
+				pop_func_stack(f);
+				push_func_stack(f);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case TokenType.ModEqual:
+				gen_expr(state, scope, f, lhs.expr);
+				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs); //GETABLE
+				append(&f.ops, MOD);
+				pop_func_stack(f);
+				pop_func_stack(f);
+				push_func_stack(f);
+				gen_expr(state, scope, f, lhs.field);
+				append(&f.ops, SETTABLE);
+				pop_func_stack(f);
+				append(&f.ops, POP);
+				pop_func_stack(f);
+			case:
+				fmt.panicf("Invalid assignment op type: %v", n.op);
+			}
 		case NodeBinary, NodeUnary:
 			gen_error(n.lhs, "cannot assign to expression.");
 		case NodeString, NodeNumber, NodeNull, NodeTrue, NodeFalse:

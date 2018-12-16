@@ -19,12 +19,10 @@ Opcode :: enum u8 {
 	SETLOCAL,
 	GETGLOBAL,
 	SETGLOBAL,
-	ADD, SUB, MUL, DIV, MOD,
-	CALL,
-	JMP,
-	IFT,
-	EQ, LT, LTE,
-	RETURN,
+	UNM, ADD, SUB, MUL, DIV, MOD,
+	EQ, LT, LTE, GT, GTE,
+	IFT, JMP,
+	CALL, RETURN,
 	NEWTABLE, SETTABLE, GETTABLE,
 	NEWARRAY,
 }
@@ -96,6 +94,62 @@ op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 }
 
 op_eq :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result: ^Value = nil;
+		if l.value == r.value {
+			result = state.true_value;
+		} else {
+			result = state.false_value;
+		}
+		return result;
+	}
+
+	return nil;
+}
+
+op_lt :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result: ^Value = nil;
+		if l.value < r.value {
+			result = state.true_value;
+		} else {
+			result = state.false_value;
+		}
+		return result;
+	}
+
+	return nil;
+}
+
+op_lte :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result: ^Value = nil;
+		if l.value <= r.value {
+			result = state.true_value;
+		} else {
+			result = state.false_value;
+		}
+		return result;
+	}
+
+	return nil;
+}
+
+op_unm :: proc(state: ^State, rhs: ^Value) -> ^Value {
+	if is_number(rhs) {
+		r := cast(^Number) rhs;
+		result := new_value(state, Number);
+		result.value = -r.value;
+		return result;
+	}
+
+	panic("Unimplemented!");
 	return nil;
 }
 
@@ -130,7 +184,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 	vm_loop: for {
 		op := Opcode(func.ops[pc]);
-		fmt.printf("pc: %d, opcode: %v\n", pc, op);
+		//fmt.printf("pc: %d, opcode: %v\n", pc, op);
 		pc += 1;
 
 		if false {
@@ -217,10 +271,18 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			sp -= 1; rhs := state.stack[sp];
 			r := op_eq(state, lhs, rhs);
 			state.stack[sp] = r; sp += 1;
-		case LT: panic("Opcode not implemented");
-		case LTE: panic("Opcode not implemented");
+		case LT:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_lt(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
+		case LTE:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_lte(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
 		case CALL:
-			// Assuming varargs is passed as table
+			// Assuming varargs is passed as array
 			sp -= 1; f := state.stack[sp];
 			assert(is_function(f));
 			fun := cast(^Function) f;
@@ -235,7 +297,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			a1 := u16(func.ops[pc]); pc += 1;
 			a2 := u16(func.ops[pc]); pc += 1;
 			dist := int(transmute(i16) (a1 << 8 | a2));
-			fmt.printf("JMP %d, pc+jmp = %d\n", dist, pc+dist);
+			//fmt.printf("JMP %d, pc+jmp = %d\n", dist, pc+dist);
 			pc += dist;
 		case RETURN:
 			break vm_loop; // Is it this easy?
@@ -255,7 +317,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 			table.data[key.str] = value;
 
-			state.stack[sp] = table_v; sp += 1;
+			state.stack[sp] = table_v; sp += 1; // PUSH table back onto stack
 		case GETTABLE:
 			sp -= 1; key_v := state.stack[sp];
 			fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
@@ -274,12 +336,16 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			state.stack[sp] = value; sp += 1;
 		case IFT:
 			// assumes well-formed opcode
-			sp -= 1; true := state.stack[sp];
-			if is_true(true) {
+			sp -= 1; val := state.stack[sp];
+			if is_true(val) {
 				continue;
 			} else {
 				pc += 3;
 			}
+		case UNM:
+			sp -= 1; v := state.stack[sp];
+			res := op_unm(state, v);
+			state.stack[sp] = res; sp += 1;
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}

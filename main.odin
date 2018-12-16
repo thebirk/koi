@@ -90,7 +90,7 @@ gc_worker_proc :: proc(t: ^thread.Thread) -> int {
 
 make_state :: proc() -> ^State {
 	state := new(State);
-	state.global_scope = new(Scope);
+	state.global_scope = make_scope(nil);
 	state.null_value = new_value(state, Null);
 	state.true_value = new_value(state, True);
 	state.false_value = new_value(state, False);
@@ -153,6 +153,87 @@ state_add_global :: proc(using state: ^State, name: string, v: ^Value) -> bool {
 	return true;
 }
 
+import_file :: proc(state: ^State, parent: ^Scope, filepath: string, import_into_file := false, import_name := "") {
+	nodes, err := parse_file(filepath);
+	if err != FileParseError.Ok {
+		panic("invalid path");
+	}
+
+	file_scope := parent;
+	if import_into_file {
+		file_scope = make_scope(parent);
+	}
+
+	module := new_value(state, Table);
+	if import_into_file {
+		if import_name != "" {
+			/*if v, ok := scope_get(file_scope, import_name); ok {
+
+			} else {
+				state_add_global(state, import_name, module);
+			}*/
+			scope_add(parent, import_name);
+			scope_set(parent, import_name, module);
+		} else {
+			panic("Unsupported");
+		}
+	}
+
+	for i in 0..len(nodes)-1 {
+		node := nodes[i];
+		switch n in node.kind {
+		case NodeImport:
+			if _, ok := file_scope.names[n.name]; ok {
+					panic("Name already exists");
+			}
+			//scope_add(file_scope, n.name);
+			scope_add(file_scope, "point");
+		case NodeVariableDecl:
+			if _, ok := file_scope.names[n.name]; ok {
+					panic("Name already exists");
+			}
+			scope_add(file_scope, n.name);
+		case NodeFn:
+			if _, ok := file_scope.names[n.name]; ok {
+					panic("Name already exists");
+			}
+			scope_add(file_scope, n.name);
+		case: panic("Unexpected top-level node type!");	
+		}
+	}
+
+	for i in 0..len(nodes)-1 {
+		node := nodes[i];
+		switch n in node.kind {
+		case NodeImport:
+			//TODO
+			import_file(state, parent, n.name, true, "point");
+		case NodeVariableDecl:
+			//HOW
+			// Create a dummy function and generate all the variable decls into here
+			// call it, but it needs to be called before we gen functions
+			// We should first add all references to all top-level nodes then generate them
+			//panic("TODO");
+		case NodeFn:
+			f := gen_function(state, file_scope, cast(^NodeFn) node);
+			//fmt.printf("f: %#v\n", f.variant);
+			//fmt.printf("f.ops:\n%#v\n", f.variant.(KoiFunction).ops);
+			/*if !state_add_global(state, n.name, f) {
+				panic("Name already exists");
+			}*/
+			scope_set(file_scope, n.name, f);
+		case: panic("Unexpected top-level node type!");	
+		}
+	}
+
+	if import_into_file {
+		for k, v in file_scope.names {
+			module.data[k] = v.value;
+		}
+		free(file_scope);
+	}
+}
+
 main :: proc() {
 /*	parser: Parser;
 	init_parser(&parser, "test.koi");
@@ -164,46 +245,12 @@ main :: proc() {
 		t = next_token(&parser);
 	}*/
 
-	nodes, err := parse_file("test_gen.koi");
+	//nodes, err := parse_file("test_gen.koi");
 	//dump_nodes(nodes);
 
 	state := make_state();
-
-	for i in 0..len(nodes)-1 {
-		node := nodes[i];
-		switch n in node.kind {
-		case NodeImport:
-			state_add_global(state, n.name, nil);
-		case NodeVariableDecl:
-			state_add_global(state, n.name, nil);
-		case NodeFn:
-			state_add_global(state, n.name, nil);
-		case: panic("Unexpected top-level node type!");	
-		}
-	}
-
-	for i in 0..len(nodes)-1 {
-		node := nodes[i];
-		switch n in node.kind {
-		case NodeImport:
-			//TODO
-		case NodeVariableDecl:
-			//HOW
-			// Create a dummy function and generate all the variable decls into here
-			// call it, but it needs to be called before we gen functions
-			// We should first add all references to all top-level nodes then generate them
-			//panic("TODO");
-		case NodeFn:
-			f := gen_function(state, state.global_scope, cast(^NodeFn) node);
-			//fmt.printf("f: %#v\n", f.variant);
-			//fmt.printf("f.ops:\n%#v\n", f.variant.(KoiFunction).ops);
-			/*if !state_add_global(state, n.name, f) {
-				panic("Name already exists");
-			}*/
-			scope_set(state.global_scope, n.name, f);
-		case: panic("Unexpected top-level node type!");	
-		}
-	}
+	//import_file(state, "tests/point.koi", true, "point");
+	import_file(state, state.global_scope, "test_gen.koi", false);
 
 	main_v, ok := scope_get(state.global_scope, "main");
 	if !ok {

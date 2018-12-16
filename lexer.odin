@@ -300,7 +300,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 			for {
 				r = next_rune(parser);
 
-				if r <= '0' || r >= '9' do break;
+				if r < '0' || r > '9' do break;
 			}
 
 			lexeme := string(parser.data[start:parser.current_rune_offset]);
