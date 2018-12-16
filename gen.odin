@@ -76,7 +76,7 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeIdent:
 		v, found := scope_get(scope, n.name);
 		if !found {
-			panic("TODO: Error, ident not found");
+			gen_error(node, "undeclared variable '%s'.", n.name);
 		}
 
 		if v.is_local {
@@ -128,21 +128,22 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		s := new_value(state, String);
 		s.str = strings.new_string(n.value);
 		k := len(f.constants);
+		append(&f.constants, s);
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
-		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHK));
+		push_func_stack(f);
 		append(&f.ops, Opcode(k));
 	case NodeNull:
-		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHNULL));
+		push_func_stack(f);
 	case NodeTrue:
-		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHTRUE));
-	case NodeFalse:
 		push_func_stack(f);
+	case NodeFalse:
 		append(&f.ops, Opcode(PUSHFALSE));
+		push_func_stack(f);
 	case NodeBinary:
 		gen_expr(state, scope, f, n.rhs);
 		gen_expr(state, scope, f, n.lhs);
@@ -164,9 +165,25 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeIndex:
 		panic("TODO");
 	case NodeField:
-		panic("TODO");
+		gen_expr(state, scope, f, n.expr);
+		gen_expr(state, scope, f, n.field);
+		append(&f.ops, GETTABLE);
+		push_func_stack(f);
+		pop_func_stack(f);
+		pop_func_stack(f);
 	case NodeCall:
 		gen_call(state, scope, f, cast(^NodeCall) node);
+	case NodeTableLiteral:
+		append(&f.ops, NEWTABLE);
+		push_func_stack(f);
+
+		for e in n.entries {
+			gen_expr(state, scope, f, e.expr);
+			gen_expr(state, scope, f, e.name);
+			append(&f.ops, SETTABLE); // Set tables restores the table to the top of the stack after use
+			pop_func_stack(f);
+			pop_func_stack(f);
+		}
 	case:
 		panic("Unexpected node type!");
 	}
@@ -193,7 +210,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		index := f.locals;
 		ok := scope_add_local(scope, n.name, index);
 		if !ok {
-			panic("Variable already exists!");
+			gen_error(node, "variable '%s' already exists.", n.name);
 		}
 		f.locals += 1;
 
@@ -299,7 +316,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			panic("//TODO:");
 		case NodeBinary, NodeUnary:
 			gen_error(n.lhs, "cannot assign to expression.");
-		case NodeNumber, NodeNull, NodeTrue, NodeFalse:
+		case NodeString, NodeNumber, NodeNull, NodeTrue, NodeFalse:
 			gen_error(n.lhs, "cannot assign to literal.");
 		case NodeCall:
 			gen_error(n.lhs, "cannot assign to function call.");
@@ -308,10 +325,40 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		}
 	case NodeIf:
 		gen_expr(state, scope, f, n.cond);
+
+		append(&f.ops, PUSHTRUE);
+		push_func_stack(f);
+
 		append(&f.ops, EQ);
+		push_func_stack(f);
+		pop_func_stack(f);
+		pop_func_stack(f);
+
 		append(&f.ops, JMP);
-		true_loc := len(f.ops);
+		true_jmp := len(f.ops);
 		append(&f.ops, Opcode(0));
+		append(&f.ops, Opcode(0));
+		false_jmp := len(f.ops);
+		append(&f.ops, Opcode(0));
+		append(&f.ops, Opcode(0));
+
+		if n.else_ != nil {
+			false_scope := make_scope(scope);
+			switch ne in n.else_.kind {
+			case NodeIf:
+				gen_stmt(state, false_scope, f, n.else_);
+			case NodeBlock:
+				gen_block(state, false_scope, f, n.else_);
+			case:
+				panic("Invalid else block node type");
+			}
+			free(false_scope);
+		}
+
+		true_loc := len(f.ops);
+		true_scope := make_scope(scope);
+		gen_block(state, true_scope, f, n.block);
+		free(true_scope);
 		
 	case NodeFor:
 		panic("TODO");
@@ -339,7 +386,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 
 	scope := make_scope(parent_scope);
 	f.arg_count = len(n.args);
-	for a, i in n.args {
+	for a in n.args {
 		scope_add_local(scope, a, f.locals);
 		f.locals += 1;
 	}

@@ -112,6 +112,47 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 			}
 			next_token(parser);
 			return expr;
+		case LeftBrace:
+			next_token(parser);
+			entries: [dynamic]NodeTableLiteralEntry;
+			for {
+				if current_token.kind == RightBrace do break;
+
+				name_loc := current_token;
+				name := parse_expr(parser);
+				switch n in name.kind {
+				case NodeIdent:
+					newname := make_string_from_string(parser, name_loc, n.name);
+					free(name);
+					name = newname;
+				case NodeString: // Do nothing
+				case:
+					parser_error(parser, name_loc, "invalid table key");
+				}
+
+				if current_token.kind != Equal {
+					parser_error(parser, "expected '=', got '%s'", current_token.lexeme);;
+				}
+				next_token(parser);
+
+				expr := parse_expr(parser);
+
+				if current_token.kind == Comma {
+					next_token(parser);
+					if current_token.kind == RightPar {
+						parser_error(parser, "expected another entry after ',', got '%s'", current_token.lexeme);
+					}
+					append(&entries, NodeTableLiteralEntry{name, expr});
+				} else {
+					append(&entries, NodeTableLiteralEntry{name, expr});
+				}
+			}
+			if current_token.kind != RightBrace {
+				panic("Invalid parser state!");
+			}
+			next_token(parser);
+
+			return make_table_literal(parser, t, entries);
 		case:
 			parser_error(parser, t, "Expected expression, got '%s'", current_token.lexeme);
 	}
@@ -136,11 +177,12 @@ parse_base :: proc(using parser: ^Parser) -> ^Node {
 			next_token(parser);
 			expr = make_index(parser, op, expr, index_expr);
 		case Dot:
+			ident := current_token;
 			if current_token.kind != TokenType.Ident {
 				parser_error(parser, "Expected identifier after '.', got '%s'", current_token.lexeme);
 			}
 			next_token(parser);
-			expr = make_field(parser, op, expr);
+			expr = make_field(parser, op, expr, ident);
 		case LeftPar:
 			args: [dynamic]^Node;
 			for {

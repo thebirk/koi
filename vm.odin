@@ -24,7 +24,7 @@ Opcode :: enum u8 {
 	JMP,
 	EQ, LT, LTE,
 	RETURN,
-	NEWTABLE,
+	NEWTABLE, SETTABLE, GETTABLE,
 	NEWARRAY,
 }
 
@@ -228,7 +228,39 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			pc += int(transmute(i16) (a1 << 8 | a2));
 		case RETURN:
 			break vm_loop; // Is it this easy?
+		case NEWTABLE:
+			v := new_value(state, Table);
+			state.stack[sp] = v; sp += 1;
+		case SETTABLE:
+			sp -= 1; key_v := state.stack[sp];
+			fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+			key := cast(^String) key_v;
 
+			sp -= 1; value := state.stack[sp];
+
+			sp -= 1; table_v := state.stack[sp];
+			fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+			table := cast(^Table) table_v;
+
+			table.data[key.str] = value;
+
+			state.stack[sp] = table_v; sp += 1;
+		case GETTABLE:
+			sp -= 1; key_v := state.stack[sp];
+			fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+			key := cast(^String) key_v;
+
+			sp -= 1; table_v := state.stack[sp];
+			fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+			table := cast(^Table) table_v;
+
+			//TODO: better error
+			value, found := table.data[key.str];
+			if !found {
+				panic("value not in table, TODO: better error");
+			}
+
+			state.stack[sp] = value; sp += 1;
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}

@@ -1,16 +1,26 @@
-// import "other_file.koi" as other
+import "other_file.koi"
 
 fn add(a, b) do return a + b;
 
 fn main(arg) {
-	//var a = 123 + 321;
-	var a = add(123, 321);
-	{
-		var c = 12;
+	var b = 123;
+	if true {
+		b -= 111;
+	} else {
+		var t = 123;
+		var c = t;
 	}
+	var c;
 
-	var b = 444/2;
-	b += 111;
+	// var a = add(123, 321);
+	// {
+	// 	var c = 12;
+	// }
 
-	return a+b+arg;
+	// var b = 444/2;
+	// b += 111;
+
+	// var table = {test = 888/4/2};
+
+	// return a+b+arg + table.test;
 }

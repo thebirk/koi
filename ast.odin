@@ -36,6 +36,7 @@ NodeIndex :: struct {
 NodeField :: struct {
 	using node: Node,
 	expr: ^Node,
+	field: ^Node,
 }
 
 NodeCall :: struct {
@@ -115,6 +116,16 @@ NodeImport :: struct {
 	name: string,
 }
 
+NodeTableLiteralEntry :: struct {
+	name: ^Node,
+	expr: ^Node,
+}
+
+NodeTableLiteral :: struct {
+	using node: Node,
+	entries: [dynamic]NodeTableLiteralEntry,
+}
+
 new_node :: proc(parser: ^Parser, $T: typeid) -> ^T {
 	n := new(T);
 	n.kind = n^;
@@ -142,6 +153,13 @@ make_string :: proc(parser: ^Parser, t: Token) -> ^NodeString {
 	return n;
 }
 
+make_string_from_string :: proc(parser: ^Parser, t: Token, str: string) -> ^NodeString {
+	n := new_node(parser, NodeString);
+	n.loc = t.loc;
+	n.value = str;
+	return n;
+}
+
 make_index :: proc(parser: ^Parser, op: Token, expr: ^Node, index: ^Node) -> ^NodeIndex {
 	n := new_node(parser, NodeIndex);
 	n.loc = op.loc;
@@ -150,10 +168,11 @@ make_index :: proc(parser: ^Parser, op: Token, expr: ^Node, index: ^Node) -> ^No
 	return n;
 }
 
-make_field :: proc(parser: ^Parser, op: Token, expr: ^Node) -> ^NodeField {
+make_field :: proc(parser: ^Parser, op: Token, expr: ^Node, field: Token) -> ^NodeField {
 	n := new_node(parser, NodeField);
 	n.loc = op.loc;
 	n.expr = expr;
+	n.field = make_string_from_string(parser, field, strings.new_string(field.lexeme));
 	return n;
 }
 
@@ -245,6 +264,13 @@ make_import :: proc(parser: ^Parser, t: Token, name: Token) -> ^NodeImport {
 	n.loc = t.loc;
 	n.name = strings.new_string(name.lexeme);
 	return n;	
+}
+
+make_table_literal :: proc(parser: ^Parser, t: Token, entries: [dynamic]NodeTableLiteralEntry) -> ^NodeTableLiteral {
+	n := new_node(parser, NodeTableLiteral);
+	n.loc = t.loc;
+	n.entries = entries;
+	return n;		
 }
 
 make_null :: proc(parser: ^Parser, t: Token) -> ^NodeNull {
