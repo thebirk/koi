@@ -4,12 +4,12 @@ fn add(a, b) do return a + b;
 
 // arg is 111
 fn main(arg) {
-	var b = 444/2;
-	// if true {
-	// 	b -= 111;
-	// } else {
-	// 	b += 111;
-	// }
+	var b = 444/4;
+	if false {
+		b *= 2;
+	} else {
+		b *= 3;
+	}
 
 	var a = add(123, 321);
 	{

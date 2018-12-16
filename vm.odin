@@ -22,6 +22,7 @@ Opcode :: enum u8 {
 	ADD, SUB, MUL, DIV, MOD,
 	CALL,
 	JMP,
+	IFT,
 	EQ, LT, LTE,
 	RETURN,
 	NEWTABLE, SETTABLE, GETTABLE,
@@ -94,6 +95,9 @@ op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
+op_eq :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	return nil;
+}
 
 call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
 	sf := push_call(state, func);
@@ -126,6 +130,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 	vm_loop: for {
 		op := Opcode(func.ops[pc]);
+		fmt.printf("pc: %d, opcode: %v\n", pc, op);
 		pc += 1;
 
 		if false {
@@ -207,7 +212,11 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			r := op_mod(state, lhs, rhs);
 			panic("mod is broken, pls fix|");
 			state.stack[sp] = r; sp += 1;
-		case EQ: panic("Opcode not implemented");
+		case EQ:
+			sp -= 1; lhs := state.stack[sp];
+			sp -= 1; rhs := state.stack[sp];
+			r := op_eq(state, lhs, rhs);
+			state.stack[sp] = r; sp += 1;
 		case LT: panic("Opcode not implemented");
 		case LTE: panic("Opcode not implemented");
 		case CALL:
@@ -225,7 +234,9 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		case JMP:
 			a1 := u16(func.ops[pc]); pc += 1;
 			a2 := u16(func.ops[pc]); pc += 1;
-			pc += int(transmute(i16) (a1 << 8 | a2));
+			dist := int(transmute(i16) (a1 << 8 | a2));
+			fmt.printf("JMP %d, pc+jmp = %d\n", dist, pc+dist);
+			pc += dist;
 		case RETURN:
 			break vm_loop; // Is it this easy?
 		case NEWTABLE:
@@ -261,6 +272,14 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			}
 
 			state.stack[sp] = value; sp += 1;
+		case IFT:
+			// assumes well-formed opcode
+			sp -= 1; true := state.stack[sp];
+			if is_true(true) {
+				continue;
+			} else {
+				pc += 3;
+			}
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}

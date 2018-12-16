@@ -161,9 +161,9 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		case Mod: append(&f.ops, Opcode(MOD));
 		case: panic("Unexpected binary op!");
 		}
+		pop_func_stack(f);
+		pop_func_stack(f);
 		push_func_stack(f);
-		pop_func_stack(f);
-		pop_func_stack(f);
 	case NodeUnary:
 		panic("TODO");
 	case NodeIndex:
@@ -172,9 +172,9 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		gen_expr(state, scope, f, n.expr);
 		gen_expr(state, scope, f, n.field);
 		append(&f.ops, GETTABLE);
+		pop_func_stack(f);
+		pop_func_stack(f);
 		push_func_stack(f);
-		pop_func_stack(f);
-		pop_func_stack(f);
 	case NodeCall:
 		gen_call(state, scope, f, cast(^NodeCall) node);
 	case NodeTableLiteral:
@@ -247,36 +247,36 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			case TokenType.Equal:
 				gen_expr(state, scope, f, n.rhs);
 			case TokenType.PlusEqual:
-				gen_expr(state, scope, f, n.lhs);
 				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs);
 				append(&f.ops, ADD);
 				push_func_stack(f);
 				pop_func_stack(f);
 				pop_func_stack(f);
 			case TokenType.MinusEqual:
-				gen_expr(state, scope, f, n.lhs);
 				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs);
 				append(&f.ops, SUB);
 				push_func_stack(f);
 				pop_func_stack(f);
 				pop_func_stack(f);
 			case TokenType.AsteriskEqual:
-				gen_expr(state, scope, f, n.lhs);
 				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs);
 				append(&f.ops, MUL);
 				push_func_stack(f);
 				pop_func_stack(f);
 				pop_func_stack(f);
 			case TokenType.SlashEqual:
-				gen_expr(state, scope, f, n.lhs);
 				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs);
 				append(&f.ops, DIV);
 				push_func_stack(f);
 				pop_func_stack(f);
 				pop_func_stack(f);
 			case TokenType.ModEqual:
-				gen_expr(state, scope, f, n.lhs);
 				gen_expr(state, scope, f, n.rhs);
+				gen_expr(state, scope, f, n.lhs);
 				append(&f.ops, MOD);
 				push_func_stack(f);
 				pop_func_stack(f);
@@ -331,19 +331,11 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeIf:
 		gen_expr(state, scope, f, n.cond);
 
-		append(&f.ops, PUSHTRUE);
-		push_func_stack(f);
-
-		append(&f.ops, EQ);
-		push_func_stack(f);
-		pop_func_stack(f);
+		append(&f.ops, IFT);
 		pop_func_stack(f);
 
-		append(&f.ops, JMP);
 		true_jmp := len(f.ops);
-		append(&f.ops, Opcode(0));
-		append(&f.ops, Opcode(0));
-		false_jmp := len(f.ops);
+		append(&f.ops, JMP);
 		append(&f.ops, Opcode(0));
 		append(&f.ops, Opcode(0));
 
@@ -360,11 +352,25 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			free(false_scope);
 		}
 
+		false_end_jmp := len(f.ops);
+		append(&f.ops, JMP);
+		append(&f.ops, Opcode(0));
+		append(&f.ops, Opcode(0));
+
 		true_loc := len(f.ops);
+		true_jmp_dist := transmute(u16) i16(true_loc - true_jmp - 3);
+		f.ops[true_jmp+1] = Opcode((true_jmp_dist >> 8) & 0xFF);
+		f.ops[true_jmp+2] = Opcode((true_jmp_dist     ) & 0xFF);
+
 		true_scope := make_scope(scope);
 		gen_block(state, true_scope, f, n.block);
 		free(true_scope);
-		
+
+		end := len(f.ops);
+		false_end_jmp_dist := transmute(u16) i16(end - false_end_jmp - 3);
+		f.ops[false_end_jmp+1] = Opcode((false_end_jmp_dist >> 8) & 0xFF);
+		f.ops[false_end_jmp+2] = Opcode((false_end_jmp_dist     ) & 0xFF);
+
 	case NodeFor:
 		panic("TODO");
 	case NodeBlock:
@@ -388,6 +394,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	fv.variant = KoiFunction{func=fv};
 	f := &(fv.variant.(KoiFunction));
 	f.stack_size = 0;
+	f.loc = n.loc;
 
 	scope := make_scope(parent_scope);
 	f.arg_count = len(n.args);
@@ -407,10 +414,11 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	if true {
 		fmt.printf("\n\nfunc: %s\nops (%d): %#v\n", n.name, len(f.ops), f.ops);
 		fmt.printf("f.arg_count: %v\n", f.arg_count);
+		fmt.printf("f.stack_size: %v\n", f.stack_size);
 		fmt.printf("constants(%v):\n", len(f.constants));
 		if false {
 			for v in f.constants {
-				fmt.printf("%#v\n", v^);
+				fmt.printf("%v\n", v^);
 			}
 		}
 	}
