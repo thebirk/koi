@@ -105,6 +105,17 @@ is_alnum :: proc(r: rune) -> bool {
 	return is_alpha(r) || (r >= '0' && r <= '9');
 }
 
+is_letter :: proc(r: rune) -> bool {
+	cat := utf8proc.category(r);
+	return
+		(cat == utf8proc.Category.LU ||
+		 cat == utf8proc.Category.LL ||
+		 cat == utf8proc.Category.LT ||
+		 cat == utf8proc.Category.LM ||
+		 cat == utf8proc.Category.LO
+		);
+}
+
 is_ident :: proc(r: rune) -> bool {
 	cat := utf8proc.category(r);
 	return 
@@ -297,10 +308,19 @@ read_token :: proc(parser: ^Parser) -> Token {
 		}
 
 		case '0'..'9': {
+			found_dot := false;
+
 			for {
+				if r == '.' {
+					if found_dot {
+						break;
+					} else {
+						found_dot = true;
+					}
+				}
 				r = next_rune(parser);
 
-				if r < '0' || r > '9' do break;
+				if (r < '0' || r > '9') && r != '.' do break;
 			}
 
 			lexeme := string(parser.data[start:parser.current_rune_offset]);
@@ -308,8 +328,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 		}
 
 		case: {
-			if is_alpha(r) || r == '_' {
-				//TODO: More ranges
+			if is_letter(r) || r == '_' {
 				for {
 					r = next_rune(parser);
 

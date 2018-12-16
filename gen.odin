@@ -74,6 +74,44 @@ pop_func_stack :: inline proc(f: ^KoiFunction) {
 	f.current_stack -= 1;
 }
 
+pool_string_constant :: proc(state: ^State, f: ^KoiFunction, str: string) -> u8 {
+	for k, i in f.constants {
+		if is_string(k) {
+			s := cast(^String) k;
+			if s.str == str {
+				return u8(i);
+			}
+		}
+	}
+
+	s := new_value(state, String);
+	s.str = strings.new_string(str);
+	k := len(f.constants);
+	assert(k >= 0 && k <= 255, "Too many constants");
+	append(&f.constants, s);
+
+	return u8(k);
+}
+
+pool_number_constant :: proc(state: ^State, f: ^KoiFunction, v: f64) -> u8 {
+	for k, i in f.constants {
+		if is_number(k) {
+			num := cast(^Number) k;
+			if num.value == v {
+				return u8(i);
+			}
+		}
+	}
+
+	num := new_value(state, Number);
+	num.value = v;
+	k := len(f.constants);
+	assert(k >= 0 && k <= 255, "Too many constants");
+	append(&f.constants, num);
+
+	return u8(k);
+}
+
 gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	using Opcode;
 	switch n in node.kind {
@@ -118,31 +156,13 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			pop_func_stack(f); // GETGLOBAL pops the previuos value of the stack
 		}
 	case NodeNumber:
-		s := new_value(state, Number);
-		s.value = n.value;
-		k := len(f.constants);
-		append(&f.constants, s);
-
-		//TODO: Constant number pooling
-
-		assert(k >= 0 && k <= 255, "Too many constants");
-
 		push_func_stack(f);
 		append(&f.ops, Opcode(PUSHK));
-		append(&f.ops, Opcode(k));
+		append(&f.ops, Opcode(pool_number_constant(state, f, n.value)));
 	case NodeString:
-		s := new_value(state, String);
-		s.str = strings.new_string(n.value);
-		k := len(f.constants);
-		append(&f.constants, s);
-
-		//TODO: Constant string pooling
-
-		assert(k >= 0 && k <= 255, "Too many constants");
-
 		append(&f.ops, Opcode(PUSHK));
 		push_func_stack(f);
-		append(&f.ops, Opcode(k));
+		append(&f.ops, Opcode(pool_string_constant(state, f, n.value)));
 	case NodeNull:
 		append(&f.ops, Opcode(PUSHNULL));
 		push_func_stack(f);
@@ -224,7 +244,12 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	using Opcode;
 	switch n in node.kind {
 	case NodeReturn:
-		gen_expr(state, scope, f, n.expr);
+		if n.expr != nil {
+			gen_expr(state, scope, f, n.expr);
+		} else {
+			append(&f.ops, PUSHNULL);
+			push_func_stack(f);
+		}
 		append(&f.ops, Opcode(RETURN));
 		pop_func_stack(f);
 	case NodeVariableDecl:
@@ -511,7 +536,8 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 		fmt.printf("constants(%v):\n", len(f.constants));
 		if false {
 			for v in f.constants {
-				fmt.printf("%v\n", v^);
+				print_value(v);
+				fmt.printf("\n");
 			}
 		}
 	}
