@@ -1,5 +1,6 @@
 package koi
 
+import "core:fmt"
 import "core:sync"
 import "shared:birk/arraylist"
 
@@ -108,4 +109,28 @@ init_marking_phase :: proc(using state: ^State) {
 
 	// Kick off worker thread
 	sync.semaphore_release(&state.start_gc_thread);
+}
+
+print_value :: proc(v: ^Value) {
+	switch v.kind {
+	case True: fmt.printf("True");
+	case False: fmt.printf("False");
+	case Null: fmt.printf("Null");
+	case Number:
+		n := cast(^Number) v;
+		fmt.printf("Number: %f", n.value);
+	case String:
+		str := cast(^String) v;
+		fmt.printf("String: \"%s\"", str.str);
+	case Function: fmt.printf("Function");
+	case Table:
+		t := cast(^Table) v;
+		fmt.printf("Table: {\n");
+		for k, v in t.data {
+			fmt.printf("    %v = %v,\n", k, v.kind);
+		}
+		fmt.printf("}\n");
+	case Array: fmt.printf("Function");
+	case: panic("Invalid value type");
+	}
 }

@@ -37,6 +37,7 @@ StackFrame :: struct {
 
 State :: struct {
 	global_scope: ^Scope,
+//	global_names: map[string]^Value,
 
 	gc_worker_stop: bool,
 	gc_worker_stop_mutex: sync.Mutex,
@@ -230,22 +231,15 @@ import_file :: proc(state: ^State, parent: ^Scope, filepath: string, import_into
 		for k, v in file_scope.names {
 			module.data[k] = v.value;
 		}
+		// We cannot currently free the scope as values are stored here
+		// we should only use scopes to check if variables are declared
+		// all actual values should be stored on the state with namespaces names
+		// ex. a fn test in import name "Test" would have the name in state: "test.Test"
 		free(file_scope);
 	}
 }
 
 main :: proc() {
-/*	parser: Parser;
-	init_parser(&parser, "test.koi");
-	fmt.printf("%#v\n", parse_expr(&parser).kind);*/
-	/*
-	t := next_token(&parser);
-	for t.kind != TokenType.Eof {
-		fmt.printf("%#v\n", t);
-		t = next_token(&parser);
-	}*/
-
-	//nodes, err := parse_file("test_gen.koi");
 	//dump_nodes(nodes);
 
 	state := make_state();
@@ -265,25 +259,8 @@ main :: proc() {
 	append(&args, a1);
 	ret := call_function(state, cast(^Function) main, args[:]);
 	fmt.printf("\n\nRETURN:\n");
-	switch ret.kind {
-		case Number:
-			fmt.printf("%#v\n", (cast(^Number)ret)^);
-		case True:
-			fmt.printf("%#v\n", ret.kind);
-		case False:
-			fmt.printf("%#v\n", ret.kind);
-		case Null:
-			fmt.printf("%#v\n", ret.kind);
-		case Table:
-			t := cast(^Table) ret;
-			fmt.printf("Table: {\n");
-			for k, v in t.data {
-				fmt.printf("    %v = %v,\n", k, v.kind);
-			}
-			fmt.printf("}\n");
-		case:
-			fmt.printf("%v, %v\n", ret, ret.kind);
-	}
-
+	print_value(ret);
+	fmt.printf("\n");
+	
 	delete_state(state);
 }

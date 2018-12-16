@@ -18,10 +18,30 @@ fn fib(n) {
 	else do return fib(n-1) + fib(n-2);
 }
 
+fn recurse(n) {
+	if n == 0 do return;
+	else do recurse(n-1);
+}
+
+// fn for_loop(n) {
+// 	{
+// 		it := 0;
+// 		for {
+// 			it += 1;
+// 			if it == n do break;
+// 		}
+// 	}
+
+// 	for i in range(0, n) {
+		
+// 	}
+// }
+
 // arg is 111
 fn main(arg) {
 	//return fib(10);
 	//return factorial(5);
+	recurse(100);
 
 	var b = 444/4;
 	if true {
@@ -35,7 +55,8 @@ fn main(arg) {
 
 	var a = add(120+p.x, 320+p.y);
 	{
-		var c = 12;
+		var π = 3.14159265358979323846;
+		return π;
 	}
 
 	var table = {test = 888/4/2};

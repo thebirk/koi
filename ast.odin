@@ -94,7 +94,6 @@ NodeForType :: enum {
 	Expr,
 	InExpr,
 	Forever,
-	Stmts,
 }
 
 NodeFor :: struct {
@@ -102,8 +101,7 @@ NodeFor :: struct {
 	forkind: NodeForType,
 	expr: ^Node,
 	inexpr: ^Node,
-	cond: ^Node,
-	step: ^Node,
+	block: ^Node,
 }
 
 NodeReturn :: struct {
@@ -250,6 +248,14 @@ make_if :: proc(parser: ^Parser, t: Token, cond: ^Node, block: ^Node, else_: ^No
 	n.block = block;
 	n.else_ = else_;
 	return n;
+}
+
+make_for_infinite :: proc(parser: ^Parser, t: Token, block: ^Node) -> ^NodeFor {
+	n := new_node(parser, NodeFor);
+	n.loc = t.loc;
+	n.forkind = NodeForType.Forever;
+	n.block = block;
+	return n;	
 }
 
 make_return :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeReturn {

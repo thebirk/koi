@@ -470,6 +470,18 @@ parse_return :: proc(using parser: ^Parser) -> ^Node {
 	return make_return(parser, t, expr);
 }
 
+parse_for :: proc(using parser: ^Parser) -> ^Node {
+	loc := current_token;
+	assert(loc.kind == TokenType.For);
+	next_token(parser);
+
+	if current_token.kind == TokenType.LeftBrace || current_token.kind == TokenType.Do {
+		block := parse_block(parser);
+		return make_for_infinite(parser, loc, block);
+	}
+	return nil;
+}
+
 parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 	t := current_token;
 
@@ -483,6 +495,8 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 		return parse_if(parser);
 	case Return:
 		return parse_return(parser);
+	case For:
+		return parse_for(parser);
 	case: {
 		loc := current_token;
 		expr := parse_expr(parser);
