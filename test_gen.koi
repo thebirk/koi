@@ -2,25 +2,22 @@ import "other_file.koi"
 
 fn add(a, b) do return a + b;
 
+// arg is 111
 fn main(arg) {
-	var b = 123;
-	if true {
-		b -= 111;
-	} else {
-		var t = 123;
-		var c = t;
-	}
-	var c;
-
-	// var a = add(123, 321);
-	// {
-	// 	var c = 12;
+	var b = 444/2;
+	// if true {
+	// 	b -= 111;
+	// } else {
+	// 	b += 111;
 	// }
 
-	// var b = 444/2;
-	// b += 111;
+	var a = add(123, 321);
+	{
+		var c = 12;
+	}
 
-	// var table = {test = 888/4/2};
+	var table = {test = 888/4/2};
+	z := {a=111}.a;
 
-	// return a+b+arg + table.test;
+	return a+b+arg + table.test + z;
 }

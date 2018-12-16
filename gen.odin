@@ -119,6 +119,8 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		k := len(f.constants);
 		append(&f.constants, s);
 
+		//TODO: Constant number pooling
+
 		assert(k >= 0 && k <= 255, "Too many constants");
 
 		push_func_stack(f);
@@ -129,6 +131,8 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		s.str = strings.new_string(n.value);
 		k := len(f.constants);
 		append(&f.constants, s);
+
+		//TODO: Constant string pooling
 
 		assert(k >= 0 && k <= 255, "Too many constants");
 
@@ -208,11 +212,6 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		pop_func_stack(f);
 	case NodeVariableDecl:
 		index := f.locals;
-		ok := scope_add_local(scope, n.name, index);
-		if !ok {
-			gen_error(node, "variable '%s' already exists.", n.name);
-		}
-		f.locals += 1;
 
 		if n.expr != nil {
 			gen_expr(state, scope, f, n.expr);
@@ -226,6 +225,12 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			pop_func_stack(f);
 			append(&f.ops, Opcode(index));
 		}
+
+		ok := scope_add_local(scope, n.name, index);
+		if !ok {
+			gen_error(node, "variable '%s' already exists.", n.name);
+		}
+		f.locals += 1;
 	case NodeCall:
 		gen_call(state, scope, f, cast(^NodeCall) node);
 		append(&f.ops, POP);
@@ -400,7 +405,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	pop_func_stack(f);
 
 	if true {
-		fmt.printf("\n\nfunc: %s\nops: %#v\n", n.name, f.ops);
+		fmt.printf("\n\nfunc: %s\nops (%d): %#v\n", n.name, len(f.ops), f.ops);
 		fmt.printf("f.arg_count: %v\n", f.arg_count);
 		fmt.printf("constants(%v):\n", len(f.constants));
 		if false {
