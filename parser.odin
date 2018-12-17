@@ -482,6 +482,32 @@ parse_for :: proc(using parser: ^Parser) -> ^Node {
 	return nil;
 }
 
+parse_while :: proc(using parser: ^Parser) -> ^Node {
+	loc := current_token;
+	assert(loc.kind == TokenType.While);
+	next_token(parser);
+
+	cond := parse_expr(parser);
+	block := parse_block(parser);
+
+	return make_while(parser, loc, cond, block);
+}
+
+parse_print :: proc(using parser: ^Parser) -> ^Node {
+	loc := current_token;
+	assert(loc.kind == TokenType.Print);
+	next_token(parser);
+
+	expr := parse_expr(parser);
+
+	if current_token.kind != TokenType.SemiColon {
+		parser_error(parser, "Expected ';', got '%s'", current_token.lexeme);
+	}
+	next_token(parser);
+
+	return make_print(parser, loc, expr);
+}
+
 parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 	t := current_token;
 
@@ -497,6 +523,10 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 		return parse_return(parser);
 	case For:
 		return parse_for(parser);
+	case While:
+		return parse_while(parser);
+	case Print:
+		return parse_print(parser);
 	case: {
 		loc := current_token;
 		expr := parse_expr(parser);

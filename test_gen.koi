@@ -14,6 +14,7 @@ fn factorial(n) {
 }
 
 fn fib(n) {
+	//var a = 1+1;
 	if n <= 2 do return 1;
 	else do return fib(n-1) + fib(n-2);
 }
@@ -21,6 +22,10 @@ fn fib(n) {
 fn recurse(n) {
 	if n == 0 do return;
 	else do recurse(n-1);
+}
+
+fn noargs() {
+	recurse(10);
 }
 
 // fn for_loop(n) {
@@ -33,15 +38,16 @@ fn recurse(n) {
 // 	}
 
 // 	for i in range(0, n) {
-		
+
 // 	}
 // }
 
 // arg is 111
 fn main(arg) {
-	//return fib(10);
+	return fib(30);
 	//return factorial(5);
-	recurse(100);
+	//recurse(100);
+	noargs();
 
 	var b = 444/4;
 	if true {

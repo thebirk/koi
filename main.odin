@@ -37,7 +37,7 @@ StackFrame :: struct {
 
 State :: struct {
 	global_scope: ^Scope,
-//	global_names: map[string]^Value,
+	global_names: map[string]^Value,
 
 	gc_worker_stop: bool,
 	gc_worker_stop_mutex: sync.Mutex,
@@ -45,6 +45,7 @@ State :: struct {
 	marking_mutex: sync.Mutex,
 	gc_thread: ^thread.Thread,
 	start_gc_thread: sync.Semaphore,
+	total_values,max_values: int,
 
 	// linked list of all allocated data
 	all_objects: ^GCObject,
@@ -62,6 +63,52 @@ State :: struct {
 	top: int,
 	stack: [dynamic]^Value,
 	call_stack: [dynamic]StackFrame,
+}
+
+gc_add_to_grey_from_white :: proc(state: ^State, v: ^Value) {
+	if v.color != GCColor.White do return;
+	v.color = GCColor.Grey;
+	v.next_list = state.grey_list;
+	if state.grey_list != nil {
+		state.grey_list.prev_list = v;
+	}
+	state.grey_list = v;
+}
+
+gc_mark_value :: proc(state: ^State, v: ^Value) {
+	if v.color == GCColor.Black do return; // Does this even happen?
+	assert(v.color == GCColor.Grey);
+
+	v.color = GCColor.Black;
+	v.next_list = state.black_list;
+	if state.black_list != nil {
+		state.black_list.prev_list = v;
+	}
+	state.black_list = v;
+
+	switch v.kind {
+	case True, False, Null, String, Number:
+		// No children to add
+	case Function:
+		f := cast(^Function) v;
+		#complete switch fv in f.variant {
+		case KoiFunction:
+			for v in fv.constants {
+				gc_add_to_grey_from_white(state, v);
+			}
+		}
+	case Table:
+		t := cast(^Table) v;
+		for _, v in t.data {
+			if v != nil do gc_add_to_grey_from_white(state, v);
+		}
+	case Array:
+		arr := cast(^Array) v;
+		for v in arr.data.data[:arr.data.size] {
+			gc_add_to_grey_from_white(state, v);
+		}
+	case: panic("Unsupported value type!");
+	}
 }
 
 gc_worker_proc :: proc(t: ^thread.Thread) -> int {
@@ -83,7 +130,59 @@ gc_worker_proc :: proc(t: ^thread.Thread) -> int {
 		}
 		sync.mutex_unlock(&state.marking_mutex);
 
-		
+		sync.mutex_lock(&state.grey_list_mutex);
+		grey_list_empty := state.grey_list == nil;
+		sync.mutex_unlock(&state.grey_list_mutex);
+
+		for !grey_list_empty {
+			sync.mutex_lock(&state.grey_list_mutex);
+
+			v := cast(^Value) state.grey_list;
+			state.grey_list = v.next_list;
+			gc_mark_value(state, v);
+
+			grey_list_empty = state.grey_list == nil;
+			if !grey_list_empty do sync.mutex_unlock(&state.grey_list_mutex);
+		}
+
+		assert(state.grey_list == nil);
+
+		// We dont want any more elements
+		// So set marking = false and grab the greylist
+		sync.mutex_lock(&state.marking_mutex);
+		state.marking = false;
+		sync.mutex_unlock(&state.marking_mutex);
+
+		freed_in_pass := 0;
+
+		gc := &state.all_objects;
+		for gc^ != nil {
+			val := gc^;
+			if val.color == GCColor.White && !val.is_constant {
+				gc^ = val.next;
+				free_value(state, cast(^Value)val);
+				freed_in_pass += 1;	
+			} else {
+				val.color = GCColor.White;
+				gc = &val.next;
+			}
+		}
+
+		fmt.printf("GC: Freed %d, Values: %d, Max: %d\n", freed_in_pass, state.total_values, state.max_values);
+		state.max_values = 2*state.total_values; // New threshold
+		//fmt.printf("New Threshold: %d\n", state.max_values);
+
+		b := state.black_list;
+		for b != nil {
+			b.color = GCColor.White;
+			b.next_list = nil;
+			b.prev_list = nil;
+			b = b.next_list;
+		}
+		state.black_list = nil;
+
+
+		sync.mutex_unlock(&state.grey_list_mutex);
 	}
 
 	return 0;
@@ -91,20 +190,25 @@ gc_worker_proc :: proc(t: ^thread.Thread) -> int {
 
 make_state :: proc() -> ^State {
 	state := new(State);
-	state.global_scope = make_scope(nil);
-	state.null_value = new_value(state, Null);
-	state.true_value = new_value(state, True);
-	state.false_value = new_value(state, False);
 
 	sync.semaphore_init(&state.start_gc_thread);
 	sync.mutex_init(&state.marking_mutex);
 	sync.mutex_init(&state.gc_worker_stop_mutex);
+	sync.mutex_init(&state.grey_list_mutex);
+
+	state.global_scope = make_scope(nil);
+	state.null_value = new_value(state, Null, false);
+	state.true_value = new_value(state, True, false);
+	state.false_value = new_value(state, False, false);
 
 	state.gc_thread = thread.create(gc_worker_proc);
 	state.gc_thread.data = rawptr(state);
 	state.gc_thread.init_context = context;
 	state.gc_thread.use_init_context = true;
 	thread.start(state.gc_thread);
+
+	state.total_values = 0;
+	state.max_values = 100;
 
 	return state;
 }
@@ -239,12 +343,23 @@ import_file :: proc(state: ^State, parent: ^Scope, filepath: string, import_into
 	}
 }
 
+// Things that aint right
+// - print "test" + 1; Passes throgh the lexer as a statement, this is aint right.
+// - print ""; Empty strings are probably broken
+
 main :: proc() {
 	//dump_nodes(nodes);
 
 	state := make_state();
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	sync.mutex_lock(&state.gc_worker_stop_mutex);
+	sync.mutex_unlock(&state.gc_worker_stop_mutex);
 	//import_file(state, "tests/point.koi", true, "point");
-	import_file(state, state.global_scope, "test_gen.koi", false);
+	//import_file(state, state.global_scope, "test_gen.koi", false);
+	import_file(state, state.global_scope, "tests/gctest.koi", false);
 
 	main_v, ok := scope_get(state.global_scope, "main");
 	if !ok {
@@ -252,6 +367,12 @@ main :: proc() {
 		os.exit(1);
 	}
 	main := main_v.value;
+
+	mk := (cast(^Function)main).variant.(KoiFunction);
+	out, err := os.open("dump.bin", os.O_RDWR|os.O_CREATE);
+	dump: []u8 = transmute([]u8) mk.ops[:];
+	os.write(out, dump);
+	os.close(out);
 
 	args: [dynamic]^Value;
 	a1 := new_value(state, Number);

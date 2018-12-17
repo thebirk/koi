@@ -14,6 +14,7 @@ GCColor :: enum {
 // when that functions returns, we remove the mark and they return to their normal lives.
 GCObject :: struct {
 	color: GCColor,
+	is_constant: b8,
 	next: ^GCObject,
 	// Used only by GCObjects in the grey of black list
 	next_list: ^GCObject,
@@ -23,6 +24,7 @@ GCObject :: struct {
 Value :: struct {
 	using gc: GCObject,
 	kind: typeid,
+	kind_str: string,
 }
 
 Null :: struct { using base: Value }
@@ -76,36 +78,102 @@ is_function :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Function);
 is_array    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Array);
 is_table    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Table);
 
-new_value :: proc(state: ^State, $T: typeid) -> ^T {
+using import "core:runtime";
+new_value :: proc(state: ^State, $T: typeid, add_to_gc := true) -> ^T {
 	val := new(T);
+	val.kind = typeid_of(T);
+	val.kind_str = (type_info_of(T).variant.(Type_Info_Named)).name;
 	
-	if state.marking {
-		val.color = GCColor.Grey;
-		val.next = state.grey_list;
-		state.grey_list = cast(^GCObject) val;
+	if add_to_gc {
+		if state.marking {
+			val.color = GCColor.Grey;
+			sync.mutex_lock(&state.grey_list_mutex);
+			val.next_list = state.grey_list;
+			if state.grey_list != nil {
+				state.grey_list.prev_list = cast(^GCObject) val;
+			}
+			state.grey_list = cast(^GCObject) val;
+			sync.mutex_unlock(&state.grey_list_mutex);
+		} else {
+			val.color = GCColor.White;
+			val.next = state.all_objects;
+			state.all_objects = cast(^GCObject) val;
+		}
+		
+		state.total_values += 1;
+		//fmt.printf("%d\n", state.max_values);
+
+		if state.total_values > state.max_values {
+			//state.max_values = 2*state.total_values;
+			//init_marking_phase(state);
+		}
 	} else {
-		val.color = GCColor.White;
-		val.next = state.all_objects;
-		state.all_objects = cast(^GCObject) val;
+		val.is_constant = true;
 	}
 
-	val.kind = typeid_of(T);
 	return val;
 }
 
+free_value :: proc(state: ^State, v: ^Value) {
+	state.total_values -= 1;
+	switch v.kind {
+	case True, False, Null, Number:
+		// Do nothing
+	case String:
+		s := cast(^String) v;
+		delete(s.str);
+	case Table:
+		t := cast(^Table) v;
+		if len(t.data) > 0 {
+			delete(t.data);
+		}
+	case Array:
+		arr := cast(^Array) v;
+		panic("TODO: free Array");
+	case Function:
+		f := cast(^Function) v;
+		fmt.printf("f: %#v\n", f^);
+		panic("TODO: free Function");
+	case: panic("Uncomplete free_value case!");
+	}
+	free(v);
+}	
+
 init_marking_phase :: proc(using state: ^State) {
 	sync.mutex_lock(&state.marking_mutex);
+	if marking {
+		sync.mutex_unlock(&state.marking_mutex);	
+		return;
+	}
 	marking = true;
 	sync.mutex_unlock(&state.marking_mutex);
+	fmt.printf("Starting to mark!\n");
 
+	sync.mutex_lock(&state.grey_list_mutex);
+	fmt.printf("Got grey list mutex!\n");
 	for i in 0..top-1 {
 		v := stack[i];
+		if v == nil do continue;
 
-		// This needs to be doubly linked list
-		v.next = state.grey_list;
 		v.color = GCColor.Grey;
+		v.next_list = state.grey_list;
+		if state.grey_list != nil {
+			state.grey_list.prev_list = v;
+		}
 		state.grey_list = v;
 	}
+
+	//TODO: Replace with state.global_names
+	for k, v in state.global_scope.names {
+		vv := v.value; // Workaround for silly mutability behaviour
+		vv.color = GCColor.Grey;
+		vv.next_list = state.grey_list;
+		if state.grey_list != nil {
+			state.grey_list.prev_list = vv;
+		}
+		state.grey_list = vv;
+	}
+	sync.mutex_unlock(&state.grey_list_mutex);
 
 	// Kick off worker thread
 	sync.semaphore_release(&state.start_gc_thread);

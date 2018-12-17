@@ -21,10 +21,11 @@ Opcode :: enum u8 {
 	SETGLOBAL,
 	UNM, ADD, SUB, MUL, DIV, MOD,
 	EQ, LT, LTE, GT, GTE,
-	IFT, JMP,
+	IFT, IFF, JMP,
 	CALL, RETURN,
 	NEWTABLE, SETTABLE, GETTABLE,
 	NEWARRAY,
+	PRINT,
 }
 
 op_add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
@@ -184,7 +185,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 	vm_loop: for {
 		op := Opcode(func.ops[pc]);
-		fmt.printf("pc: %d, opcode: %v\n", pc, op);
+		fmt.printf("pc: % 3d, opcode: %v\n", pc, op);
 		pc += 1;
 
 		if false {
@@ -282,7 +283,8 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			r := op_lte(state, lhs, rhs);
 			state.stack[sp] = r; sp += 1;
 		case CALL:
-			// Assuming varargs is passed as array
+			// Assuming varargs is passed as array.. nah
+			// It would be easier if we created the table here
 			sp -= 1; f := state.stack[sp];
 			assert(is_function(f));
 			fun := cast(^Function) f;
@@ -297,7 +299,6 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			a1 := u16(func.ops[pc]); pc += 1;
 			a2 := u16(func.ops[pc]); pc += 1;
 			dist := int(transmute(i16) (a1 << 8 | a2));
-			//fmt.printf("JMP %d, pc+jmp = %d\n", dist, pc+dist);
 			pc += dist;
 		case RETURN:
 			break vm_loop; // Is it this easy?
@@ -342,10 +343,22 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			} else {
 				pc += 3;
 			}
+		case IFF:
+			// assumes well-formed opcode
+			sp -= 1; val := state.stack[sp];
+			if is_false(val) {
+				continue;
+			} else {
+				pc += 3;
+			}
 		case UNM:
 			sp -= 1; v := state.stack[sp];
 			res := op_unm(state, v);
 			state.stack[sp] = res; sp += 1;
+		case PRINT:
+			sp -= 1; v := state.stack[sp];
+			print_value(v);
+			fmt.printf("\n");
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}

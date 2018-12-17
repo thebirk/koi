@@ -20,6 +20,7 @@ TokenType :: enum {
 	Import,
 	While, // Odin style for while?
 	For,   // iterators ala next(it)?
+	Print,
 	Number,
 	String,
 	True,
@@ -340,10 +341,11 @@ read_token :: proc(parser: ^Parser) -> Token {
 				switch lexeme {
 					case "var"      : token_type = TokenType.Var;
 					case "if"       : token_type = TokenType.If;
-					case "else"       : token_type = TokenType.Else;
 					case "true"     : token_type = TokenType.True;
-					case "false"    : token_type = TokenType.False;
 					case "null"     : token_type = TokenType.Null;
+					case "print"    : token_type = TokenType.Print;
+					case "false"    : token_type = TokenType.False;
+					case "else"     : token_type = TokenType.Else;
 					case "fn"       : token_type = TokenType.Fn;
 					case "import"   : token_type = TokenType.Import;
 					case "return"   : token_type = TokenType.Return;

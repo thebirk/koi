@@ -277,6 +277,10 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		gen_call(state, scope, f, cast(^NodeCall) node);
 		append(&f.ops, POP);
 		pop_func_stack(f);
+	case NodePrint:
+		gen_expr(state, scope, f, n.expr);
+		append(&f.ops, PRINT);
+		pop_func_stack(f);
 	case NodeAssignment:
 		switch lhs in n.lhs.kind {
 		case NodeIdent:
@@ -450,7 +454,6 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		gen_expr(state, scope, f, n.cond);
 
 		append(&f.ops, IFT);
-		pop_func_stack(f);
 
 		true_jmp := len(f.ops);
 		append(&f.ops, JMP);
@@ -491,6 +494,31 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 	case NodeFor:
 		panic("TODO");
+	case NodeWhile:
+		cond := len(f.ops);
+		gen_expr(state, scope, f, n.cond);
+		append(&f.ops, IFF);
+
+		end_jmp := len(f.ops);
+		append(&f.ops, JMP);
+		append(&f.ops, Opcode(0));
+		append(&f.ops, Opcode(0));
+
+		// No need for a custom scope for the while loop as all block have their own.
+		gen_block(state, scope, f, n.block);
+
+		cond_jmp := len(f.ops);
+		append(&f.ops, JMP);
+		append(&f.ops, Opcode(0));
+		append(&f.ops, Opcode(0));
+		cond_jmp_dist := transmute(u16) i16(cond - cond_jmp - 3);
+		f.ops[cond_jmp+1] = Opcode((cond_jmp_dist >> 8) & 0xFF);
+		f.ops[cond_jmp+2] = Opcode((cond_jmp_dist     ) & 0xFF);
+
+		end := len(f.ops);
+		end_jmp_dist := transmute(u16) i16(end_jmp - end - 3);
+		f.ops[end_jmp+1] = Opcode((end_jmp_dist >> 8) & 0xFF);
+		f.ops[end_jmp+2] = Opcode((end_jmp_dist     ) & 0xFF);
 	case NodeBlock:
 		gen_block(state, scope, f, node);
 		
