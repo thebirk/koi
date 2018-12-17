@@ -351,12 +351,12 @@ main :: proc() {
 	//dump_nodes(nodes);
 
 	state := make_state();
-	sync.mutex_lock(&state.gc_worker_stop_mutex);
-	sync.mutex_lock(&state.gc_worker_stop_mutex);
-	sync.mutex_lock(&state.gc_worker_stop_mutex);
-	sync.mutex_lock(&state.gc_worker_stop_mutex);
-	sync.mutex_lock(&state.gc_worker_stop_mutex);
-	sync.mutex_unlock(&state.gc_worker_stop_mutex);
+	// sync.mutex_lock(&state.gc_worker_stop_mutex);
+	// sync.mutex_lock(&state.gc_worker_stop_mutex);
+	// sync.mutex_lock(&state.gc_worker_stop_mutex);
+	// sync.mutex_lock(&state.gc_worker_stop_mutex);
+	// sync.mutex_lock(&state.gc_worker_stop_mutex);
+	// sync.mutex_unlock(&state.gc_worker_stop_mutex);
 	//import_file(state, "tests/point.koi", true, "point");
 	//import_file(state, state.global_scope, "test_gen.koi", false);
 	import_file(state, state.global_scope, "tests/gctest.koi", false);

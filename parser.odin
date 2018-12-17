@@ -479,18 +479,16 @@ parse_for :: proc(using parser: ^Parser) -> ^Node {
 		block := parse_block(parser);
 		return make_for_infinite(parser, loc, block);
 	}
+
+	expr := parse_expr(parser);
+
+	if current_token.kind == TokenType.LeftBrace || current_token.kind == TokenType.Do {
+		block := parse_block(parser);
+		return make_for_expr(parser, loc, expr, block);
+	}
+
+	panic("For");
 	return nil;
-}
-
-parse_while :: proc(using parser: ^Parser) -> ^Node {
-	loc := current_token;
-	assert(loc.kind == TokenType.While);
-	next_token(parser);
-
-	cond := parse_expr(parser);
-	block := parse_block(parser);
-
-	return make_while(parser, loc, cond, block);
 }
 
 parse_print :: proc(using parser: ^Parser) -> ^Node {
@@ -523,8 +521,6 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 		return parse_return(parser);
 	case For:
 		return parse_for(parser);
-	case While:
-		return parse_while(parser);
 	case Print:
 		return parse_print(parser);
 	case: {
@@ -575,7 +571,8 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 				return expr;
 		}
 
-		parser_error(parser, loc, "Expression is not allowed at statement level.");
+		//parser_error(parser, loc, "Expression is not allowed at statement level.");
+		parser_error(parser, loc, "Expected statement, got '%s'", loc.lexeme);
 		return nil;
 	}
 	}

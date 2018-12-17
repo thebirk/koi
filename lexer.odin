@@ -18,7 +18,6 @@ TokenType :: enum {
 	If,
 	Else,
 	Import,
-	While, // Odin style for while?
 	For,   // iterators ala next(it)?
 	Print,
 	Number,
@@ -350,7 +349,6 @@ read_token :: proc(parser: ^Parser) -> Token {
 					case "import"   : token_type = TokenType.Import;
 					case "return"   : token_type = TokenType.Return;
 					case "do"       : token_type = TokenType.Do;
-					case "while"    : token_type = TokenType.While;
 					case "for"      : token_type = TokenType.For;
 					case "break"    : token_type = TokenType.Break;
 					case "continue" : token_type = TokenType.Continue;

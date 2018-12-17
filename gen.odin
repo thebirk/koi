@@ -331,6 +331,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 				fmt.panicf("Invalid assignment op type: %v", n.op);
 			}
 
+			fmt.printf("op: %d, lhs.name: %s, is_local: %v, index: %d\n", len(f.ops), lhs.name, v.is_local, v.local_index);
 			if v.is_local {
 				append(&f.ops, SETLOCAL);
 				pop_func_stack(f);
@@ -493,32 +494,49 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		f.ops[false_end_jmp+2] = Opcode((false_end_jmp_dist     ) & 0xFF);
 
 	case NodeFor:
-		panic("TODO");
-	case NodeWhile:
-		cond := len(f.ops);
-		gen_expr(state, scope, f, n.cond);
-		append(&f.ops, IFF);
+		using NodeForType;
+		#complete switch n.forkind {
+		case Forever:
+			//TODO: Break support.
+			start := len(f.ops);
+			gen_block(state, scope, f, n.block);
 
-		end_jmp := len(f.ops);
-		append(&f.ops, JMP);
-		append(&f.ops, Opcode(0));
-		append(&f.ops, Opcode(0));
+			end_jmp := len(f.ops);
+			append(&f.ops, JMP);
+			append(&f.ops, Opcode(0));
+			append(&f.ops, Opcode(0));
+			
+			end_jmp_dist := transmute(u16) i16(start - end_jmp - 3);
+			f.ops[end_jmp+1] = Opcode((end_jmp_dist >> 8) & 0xFF);
+			f.ops[end_jmp+2] = Opcode((end_jmp_dist     ) & 0xFF);
+		case Expr:
+			cond := len(f.ops);
+			gen_expr(state, scope, f, n.expr);
+			append(&f.ops, IFF);
 
-		// No need for a custom scope for the while loop as all block have their own.
-		gen_block(state, scope, f, n.block);
+			end_jmp := len(f.ops);
+			append(&f.ops, JMP);
+			append(&f.ops, Opcode(0));
+			append(&f.ops, Opcode(0));
 
-		cond_jmp := len(f.ops);
-		append(&f.ops, JMP);
-		append(&f.ops, Opcode(0));
-		append(&f.ops, Opcode(0));
-		cond_jmp_dist := transmute(u16) i16(cond - cond_jmp - 3);
-		f.ops[cond_jmp+1] = Opcode((cond_jmp_dist >> 8) & 0xFF);
-		f.ops[cond_jmp+2] = Opcode((cond_jmp_dist     ) & 0xFF);
+			// No need for a custom scope for the Expr loop as all block have their own.
+			gen_block(state, scope, f, n.block);
 
-		end := len(f.ops);
-		end_jmp_dist := transmute(u16) i16(end_jmp - end - 3);
-		f.ops[end_jmp+1] = Opcode((end_jmp_dist >> 8) & 0xFF);
-		f.ops[end_jmp+2] = Opcode((end_jmp_dist     ) & 0xFF);
+			cond_jmp := len(f.ops);
+			append(&f.ops, JMP);
+			append(&f.ops, Opcode(0));
+			append(&f.ops, Opcode(0));
+			cond_jmp_dist := transmute(u16) i16(cond - cond_jmp - 3);
+			f.ops[cond_jmp+1] = Opcode((cond_jmp_dist >> 8) & 0xFF);
+			f.ops[cond_jmp+2] = Opcode((cond_jmp_dist     ) & 0xFF);
+
+			end := len(f.ops);
+			end_jmp_dist := transmute(u16) i16(end - end_jmp - 3);
+			f.ops[end_jmp+1] = Opcode((end_jmp_dist >> 8) & 0xFF);
+			f.ops[end_jmp+2] = Opcode((end_jmp_dist     ) & 0xFF);
+		case InExpr:
+			panic("TODO: InExpr");
+		}
 	case NodeBlock:
 		gen_block(state, scope, f, node);
 		

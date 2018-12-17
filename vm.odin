@@ -185,7 +185,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 	vm_loop: for {
 		op := Opcode(func.ops[pc]);
-		fmt.printf("pc: % 3d, opcode: %v\n", pc, op);
+		//fmt.printf("pc: % 3d, opcode: %v\n", pc, op);
 		pc += 1;
 
 		if false {

@@ -269,12 +269,13 @@ make_for_infinite :: proc(parser: ^Parser, t: Token, block: ^Node) -> ^NodeFor {
 	return n;	
 }
 
-make_while :: proc(parser: ^Parser, t: Token, cond: ^Node, block: ^Node) -> ^NodeWhile {
-	n := new_node(parser, NodeWhile);
+make_for_expr :: proc(parser: ^Parser, t: Token, expr: ^Node, block: ^Node) -> ^NodeFor {
+	n := new_node(parser, NodeFor);
 	n.loc = t.loc;
-	n.cond = cond;
+	n.forkind = NodeForType.Expr;
+	n.expr = expr;
 	n.block = block;
-	return n;		
+	return n;	
 }
 
 make_return :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeReturn {
