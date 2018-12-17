@@ -172,6 +172,10 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	case NodeFalse:
 		append(&f.ops, Opcode(PUSHFALSE));
 		push_func_stack(f);
+	case NodeLen:
+		gen_expr(state, scope, f, n.expr);
+		append(&f.ops, LEN);
+		push_func_stack(f);
 	case NodeBinary:
 		gen_expr(state, scope, f, n.rhs);
 		gen_expr(state, scope, f, n.lhs);
@@ -510,6 +514,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			f.ops[end_jmp+1] = Opcode((end_jmp_dist >> 8) & 0xFF);
 			f.ops[end_jmp+2] = Opcode((end_jmp_dist     ) & 0xFF);
 		case Expr:
+			//TODO: When we get InExpr working, allow this to do some of the same stuff
 			cond := len(f.ops);
 			gen_expr(state, scope, f, n.expr);
 			append(&f.ops, IFF);

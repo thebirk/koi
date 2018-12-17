@@ -19,7 +19,9 @@ TokenType :: enum {
 	Else,
 	Import,
 	For,   // iterators ala next(it)?
+	In,
 	Print,
+	Len,
 	Number,
 	String,
 	True,
@@ -291,15 +293,15 @@ read_token :: proc(parser: ^Parser) -> Token {
 		}
 
 		case '"': {
-			next_rune(parser);
+			r = next_rune(parser);
 			start = parser.current_rune_offset;
 
 			//TODO: Handle escapes
 			for {
-				r = next_rune(parser);
-				if r == utf8.RUNE_ERROR do return Token{TokenType.Eof, "eof", loc};
-
 				if r == '"' do break;
+
+				r = next_rune(parser);
+				if r == utf8.RUNE_ERROR do parser_error(parser, Token{loc=loc}, "unexpected end of file while parsing string");
 			}
 
 			lexeme := string(parser.data[start:parser.current_rune_offset]);
@@ -343,6 +345,8 @@ read_token :: proc(parser: ^Parser) -> Token {
 					case "true"     : token_type = TokenType.True;
 					case "null"     : token_type = TokenType.Null;
 					case "print"    : token_type = TokenType.Print;
+					case "len"      : token_type = TokenType.Len;
+					case "in"       : token_type = TokenType.In;
 					case "false"    : token_type = TokenType.False;
 					case "else"     : token_type = TokenType.Else;
 					case "fn"       : token_type = TokenType.Fn;

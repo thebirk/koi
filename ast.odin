@@ -135,6 +135,11 @@ NodePrint :: struct {
 	expr: ^Node,
 }
 
+NodeLen :: struct {
+	using node: Node,
+	expr: ^Node,
+}
+
 new_node :: proc(parser: ^Parser, $T: typeid) -> ^T {
 	n := new(T);
 	n.kind = n^;
@@ -266,7 +271,7 @@ make_for_infinite :: proc(parser: ^Parser, t: Token, block: ^Node) -> ^NodeFor {
 	n.loc = t.loc;
 	n.forkind = NodeForType.Forever;
 	n.block = block;
-	return n;	
+	return n;
 }
 
 make_for_expr :: proc(parser: ^Parser, t: Token, expr: ^Node, block: ^Node) -> ^NodeFor {
@@ -275,7 +280,17 @@ make_for_expr :: proc(parser: ^Parser, t: Token, expr: ^Node, block: ^Node) -> ^
 	n.forkind = NodeForType.Expr;
 	n.expr = expr;
 	n.block = block;
-	return n;	
+	return n;
+}
+
+make_for_inexpr :: proc(parser: ^Parser, t: Token, expr: ^Node, inexpr: ^Node, block: ^Node) -> ^NodeFor {
+	n := new_node(parser, NodeFor);
+	n.loc = t.loc;
+	n.forkind = NodeForType.InExpr;
+	n.expr = expr;
+	n.inexpr = inexpr;
+	n.block = block;
+	return n;
 }
 
 make_return :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeReturn {
@@ -289,21 +304,28 @@ make_import :: proc(parser: ^Parser, t: Token, name: Token) -> ^NodeImport {
 	n := new_node(parser, NodeImport);
 	n.loc = t.loc;
 	n.name = strings.new_string(name.lexeme);
-	return n;	
+	return n;
 }
 
 make_table_literal :: proc(parser: ^Parser, t: Token, entries: [dynamic]NodeTableLiteralEntry) -> ^NodeTableLiteral {
 	n := new_node(parser, NodeTableLiteral);
 	n.loc = t.loc;
 	n.entries = entries;
-	return n;		
+	return n;
 }
 
 make_print :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodePrint {
 	n := new_node(parser, NodePrint);
 	n.loc = t.loc;
 	n.expr = expr;
-	return n;			
+	return n;
+}
+
+make_len :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeLen {
+	n := new_node(parser, NodeLen);
+	n.loc = t.loc;
+	n.expr = expr;
+	return n;
 }
 
 make_null :: proc(parser: ^Parser, t: Token) -> ^NodeNull {

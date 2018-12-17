@@ -25,7 +25,7 @@ Opcode :: enum u8 {
 	CALL, RETURN,
 	NEWTABLE, SETTABLE, GETTABLE,
 	NEWARRAY,
-	PRINT,
+	PRINT, LEN,
 }
 
 op_add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
@@ -85,8 +85,9 @@ op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
 		result := new_value(state, Number);
-		fmt.printf("math.mod(3, 2) = %v\n", math.mod_f64(3, 2));
-		result.value = math.mod(l.value, r.value);
+		// panic("mod is broken, pls fix");
+		// result.value = math.mod(l.value, r.value);
+		result.value = l.value - f64(int(l.value / r.value)) * r.value;
 		return result;
 	}
 
@@ -154,6 +155,25 @@ op_unm :: proc(state: ^State, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
+vm_len :: proc(state: ^State, val: ^Value) -> ^Value {
+	res := new_value(state, Number);
+
+	switch val.kind {
+	case String:
+		s := cast(^String) val;
+		res.value = f64(len(s.str));
+	case Table:
+		t := cast(^Table) val;
+		res.value = f64(len(t.data));
+	case Array:
+		a := cast(^Array) val;
+		res.value = f64(a.data.size);
+	case: panic("TODO: Better error");
+	}
+
+	return res;
+}
+
 call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
 	sf := push_call(state, func);
 	result: ^Value = nil;
@@ -165,6 +185,27 @@ call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value 
 	pop_call(state);
 
 	return result;
+}
+
+vm_print_value :: proc(v: ^Value) {
+	switch v.kind {
+	case Null: fmt.printf("null");
+	case True: fmt.printf("true");
+	case False: fmt.printf("false");
+	case Number:
+		n := cast(^Number) v;
+		fmt.printf("%f", n.value);
+	case String:
+		s := cast(^String) v;
+		fmt.printf("%s", s.str);
+	case Table:
+		fmt.printf("[table @ %p]", v);
+	case Array:
+		fmt.printf("[array @ %p]", v);
+	case Function:
+		fmt.printf("[function @ %p]", v);
+	case: panic("Invalid type");
+	}
 }
 
 // Pass this a file scope, instead of have it using state.global_scope?
@@ -265,7 +306,6 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			sp -= 1; lhs := state.stack[sp];
 			sp -= 1; rhs := state.stack[sp];
 			r := op_mod(state, lhs, rhs);
-			panic("mod is broken, pls fix|");
 			state.stack[sp] = r; sp += 1;
 		case EQ:
 			sp -= 1; lhs := state.stack[sp];
@@ -357,8 +397,12 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			state.stack[sp] = res; sp += 1;
 		case PRINT:
 			sp -= 1; v := state.stack[sp];
-			print_value(v);
+			vm_print_value(v);
 			fmt.printf("\n");
+		case LEN:
+			sp -= 1; v := state.stack[sp];
+			res := vm_len(state, v);
+			state.stack[sp] = res; sp += 1;
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}

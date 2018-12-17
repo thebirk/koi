@@ -102,6 +102,22 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 		case String:
 			next_token(parser);
 			return make_string(parser, t);
+		case Len:
+			next_token(parser);
+			
+			if current_token.kind != LeftPar {
+				parser_error(parser, "Expected '(' after 'len', got '%s'", current_token.lexeme);
+			}
+			next_token(parser);
+
+			expr := parse_expr(parser);
+
+			if current_token.kind != RightPar {
+				parser_error(parser, "Expected ')', got '%s'", current_token.lexeme);
+			}
+			next_token(parser);
+
+			return make_len(parser, t, expr);
 		case LeftPar:
 			next_token(parser);
 			expr := parse_expr(parser);
@@ -487,8 +503,20 @@ parse_for :: proc(using parser: ^Parser) -> ^Node {
 		return make_for_expr(parser, loc, expr, block);
 	}
 
-	panic("For");
-	return nil;
+	if current_token.kind != TokenType.In {
+		parser_error(parser, "expected 'in', got '%s'", current_token.lexeme);
+	}
+	next_token(parser);
+
+	if current_token.kind == TokenType.LeftBrace || current_token.kind == TokenType.Do {
+		//Kind of hack to provide better errors
+		parser_error(parser, "expected expression, got '%s'", current_token.lexeme);
+	}
+
+	inexpr := parse_expr(parser);
+	block := parse_block(parser);
+
+	return make_for_inexpr(parser, loc, expr, inexpr, block);
 }
 
 parse_print :: proc(using parser: ^Parser) -> ^Node {
