@@ -81,6 +81,7 @@ parser_error :: proc{
 
 parse_operand :: proc(using parser: ^Parser) -> ^Node {
 	t := current_token;
+	loc := current_token; // jadajada
 
 	using TokenType;
 	switch t.kind {
@@ -102,6 +103,81 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 		case String:
 			next_token(parser);
 			return make_string(parser, t);
+		case Fn:
+			next_token(parser);
+
+			args: [dynamic]string;
+			is_vararg := false;
+			t := current_token;
+			if t.kind != TokenType.LeftPar {
+				parser_error(parser, "Expected '(' after 'fn', got '%s'", t.lexeme);
+			}
+			next_token(parser);
+
+			for {
+				t := current_token;
+
+				if t.kind == TokenType.RightPar {
+					break;
+				}
+				else if t.kind == TokenType.Vararg {
+					if is_vararg {
+						parser_error(parser, "There can only be one vararg agrument.");
+					} else {
+						is_vararg = true;
+					}
+					next_token(parser);
+
+					t = current_token;
+					if t.kind != TokenType.Ident {
+						parser_error(parser, "Expected identifier after '..'");
+					}
+					next_token(parser);
+
+					append(&args, strings.new_string(t.lexeme));
+
+					t = current_token;
+					if t.kind == TokenType.RightPar {
+						break;
+					}
+				}
+				else if t.kind == TokenType.Ident {
+					if is_vararg {
+						parser_error(parser, "You cannot supply more arguments after '..'");
+					}
+
+					append(&args, strings.new_string(t.lexeme));
+					next_token(parser);
+
+					t = current_token;
+					if t.kind == TokenType.RightPar {
+						break;
+					}
+				}
+				else {
+					parser_error(parser, "Expected argument, got '%s'", t.lexeme);
+				}
+
+				t = current_token;
+				if t.kind != TokenType.Comma {
+					parser_error(parser, "Expected ',' after argument, got '%s'", t.lexeme);
+				}
+				next_token(parser);
+
+				t = current_token;
+				if t.kind == TokenType.RightPar {
+					parser_error(parser, "Trailing ',' is not allowed in argument lists.");
+				}
+			}
+			t = current_token;
+			if t.kind != TokenType.RightPar {
+				parser_error(parser, "Expected ')' after argument list, got '%s'", t.lexeme);
+			}
+			next_token(parser);
+
+			block := parse_block(parser);
+
+			return make_fn_expr(parser, loc, args, is_vararg, block);
 		case Len:
 			next_token(parser);
 			

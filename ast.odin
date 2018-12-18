@@ -145,6 +145,13 @@ NodeLen :: struct {
 	expr: ^Node,
 }
 
+NodeFnExpr :: struct {
+	using node: Node,
+	args: [dynamic]string,
+	last_is_vararg: bool,
+	block: ^Node,
+}
+
 new_node :: proc(parser: ^Parser, $T: typeid) -> ^T {
 	n := new(T);
 	n.kind = n^;
@@ -338,6 +345,15 @@ make_len :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodeLen {
 	n.loc = t.loc;
 	n.expr = expr;
 	return n;
+}
+
+make_fn_expr :: proc(parser: ^Parser, t: Token, args: [dynamic]string, last_is_vararg: bool, block: ^Node) -> ^NodeFnExpr {
+	n := new_node(parser, NodeFnExpr);
+	n.loc = t.loc;
+	n.args = args;
+	n.last_is_vararg = last_is_vararg;
+	n.block = block;
+	return n;	
 }
 
 make_null :: proc(parser: ^Parser, t: Token) -> ^NodeNull {

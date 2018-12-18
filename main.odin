@@ -141,6 +141,14 @@ import_file :: proc(state: ^State, parent: ^Scope, filepath: string, import_into
 		panic("invalid path");
 	}
 
+	if true {
+		out, ok := os.open("out.dump", os.O_CREATE);
+		for n in nodes {
+			print_node(out, n);
+		}
+		os.close(out);
+	}
+
 	file_scope := parent;
 	if import_into_file {
 		file_scope = make_scope(parent);
@@ -235,7 +243,8 @@ main :: proc() {
 	// sync.mutex_unlock(&state.gc_worker_stop_mutex);
 	//import_file(state, "tests/point.koi", true, "point");
 	//import_file(state, state.global_scope, "test_gen.koi", false);
-	import_file(state, state.global_scope, "tests/gctest.koi", false);
+	//import_file(state, state.global_scope, "tests/gctest.koi", false);
+	import_file(state, state.global_scope, "tests/tablesandfns.koi", false);
 
 	main_v, ok := scope_get(state.global_scope, "main");
 	if !ok {
@@ -244,11 +253,13 @@ main :: proc() {
 	}
 	main := main_v.value;
 
-	mk := (cast(^Function)main).variant.(KoiFunction);
-	out, err := os.open("dump.bin", os.O_RDWR|os.O_CREATE);
-	dump: []u8 = transmute([]u8) mk.ops[:];
-	os.write(out, dump);
-	os.close(out);
+	if false {
+		mk := (cast(^Function)main).variant.(KoiFunction);
+		out, err := os.open("dump.bin", os.O_RDWR|os.O_CREATE);
+		dump: []u8 = transmute([]u8) mk.ops[:];
+		os.write(out, dump);
+		os.close(out);
+	}
 
 	args: [dynamic]^Value;
 	a1 := new_value(state, Number);

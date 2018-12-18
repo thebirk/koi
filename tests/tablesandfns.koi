@@ -1,0 +1,27 @@
+fn Point(x, y) do return {
+	x = x,
+	y = y,
+
+	add = fn(self, p) {
+		self.x += p.x;
+		self.y += p.y;
+		return Point(self.x + p.x, self.y + p.y);
+	},
+
+	pretty = fn(self) {
+		print "x:";
+		print self.x;
+		print "y:";
+		print self.y;
+	}
+};
+
+fn main(args) {
+	p := Point(32, 16);
+	p.pretty(p);
+
+	res := p.add(p, Point(-32, +16));
+	res.pretty(res);
+
+	p.pretty(p);
+}

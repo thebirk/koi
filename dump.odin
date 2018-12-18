@@ -78,6 +78,12 @@ print_node :: proc(out: os.Handle, node: ^Node) {
 			fmt.fprintf(out, "6;Import;Stub;");
 		case NodeTableLiteral:
 			fmt.fprintf(out, "6;TableLiteral;Stub;");
+		case NodePrint:
+			fmt.fprintf(out, "6;Print;Stub;");
+		case NodeLen:
+			fmt.fprintf(out, "6;Len;Stub;");
+		case NodeFnExpr:
+			fmt.fprintf(out, "6;FnExpr;Stub;");
 		case: panic("Invalid node in print_node");
 	}
 }

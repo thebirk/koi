@@ -248,13 +248,19 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		}
 
 		//No need to push table as SETARRAY does not pop the array
+	case NodeFnExpr:
+		k := len(f.constants);
+		assert(k >= 0 && k <= 255, "Too many constants");
+		append(&f.constants, gen_function_expr(state, scope, cast(^NodeFnExpr)node));
+		append(&f.ops, PUSHK);
+		push_func_stack(f);
+		append(&f.ops, Opcode(k));
 	case:
 		panic("Unexpected node type!");
 	}
 }
 
 gen_call :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^NodeCall) {
-	//TODO: Determine argument order. Should we push in reverse
 	for i := len(node.args)-1; i >= 0; i -= 1 {
 		gen_expr(state, scope, f, node.args[i]);
 	}
@@ -574,6 +580,49 @@ gen_block :: proc(state: ^State, parent_scope: ^Scope, f: ^KoiFunction, node: ^N
 	for stmt in n.stmts {
 		gen_stmt(state, scope, f, stmt);
 	}
+}
+
+gen_function_expr :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFnExpr) -> ^Function {
+	fv := new_value(state, Function);
+	fv.variant = KoiFunction{func=fv};
+	f := &(fv.variant.(KoiFunction));
+	f.stack_size = 0;
+	f.loc = n.loc;
+
+	scope := make_scope(parent_scope);
+	f.arg_count = len(n.args);
+	for a in n.args {
+		scope_add_local(scope, a, f.locals);
+		f.locals += 1;
+	}
+
+	gen_block(state, scope, f, n.block);
+
+	// Return something
+	append(&f.ops, Opcode(Opcode.PUSHNULL));
+	push_func_stack(f);
+	append(&f.ops, Opcode(Opcode.RETURN));
+	pop_func_stack(f);
+
+	if true {
+		fmt.printf("\nanon function\n");
+		fmt.printf("arguments: %v\n", f.arg_count);
+		fmt.printf("stack_size: %v\n", f.stack_size);
+		fmt.printf("constants(%v):\n", len(f.constants));
+		if true {
+			for v in f.constants {
+				fmt.printf("  ");
+				print_value(v);
+				fmt.printf("\n");
+			}
+		}
+		fmt.printf("\nops(%d):\n", len(f.ops));
+		pretty_print(f);
+		fmt.printf("\n");
+
+	}
+
+	return fv;
 }
 
 gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Function {

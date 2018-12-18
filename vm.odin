@@ -326,7 +326,11 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			// Assuming varargs is passed as array.. nah
 			// It would be easier if we created the table here
 			sp -= 1; f := state.stack[sp];
-			assert(is_function(f));
+			if !is_function(f) {
+				print_value(f);
+				fmt.printf("\n");
+				fmt.assertf(is_function(f), "Expected Function got %v", f.kind);
+			}
 			fun := cast(^Function) f;
 			clear(&args_buffer);
 			for i in 0..fun.arg_count-1 {
