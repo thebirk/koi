@@ -130,6 +130,11 @@ NodeTableLiteral :: struct {
 	entries: [dynamic]NodeTableLiteralEntry,
 }
 
+NodeArrayLiteral :: struct {
+	using node: Node,
+	entries: [dynamic]^Node,
+}
+
 NodePrint :: struct {
 	using node: Node,
 	expr: ^Node,
@@ -312,6 +317,13 @@ make_table_literal :: proc(parser: ^Parser, t: Token, entries: [dynamic]NodeTabl
 	n.loc = t.loc;
 	n.entries = entries;
 	return n;
+}
+
+make_array_literal :: proc(parser: ^Parser, t: Token, entries: [dynamic]^Node) -> ^NodeArrayLiteral{
+	n := new_node(parser, NodeArrayLiteral);
+	n.loc = t.loc;
+	n.entries = entries;
+	return n;	
 }
 
 make_print :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodePrint {

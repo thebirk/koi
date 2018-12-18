@@ -128,6 +128,30 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 			}
 			next_token(parser);
 			return expr;
+		case LeftBracket:
+			next_token(parser);
+			
+			entries: [dynamic]^Node;
+			for {
+				if current_token.kind == RightBracket do break;
+
+				expr := parse_expr(parser);
+				append(&entries, expr);
+
+				if current_token.kind == Comma {
+					next_token(parser);
+					if current_token.kind == RightPar {
+						parser_error(parser, "expected another expression after ',', got '%s'", current_token.lexeme);
+					}
+				}
+			}
+
+			if current_token.kind != RightBracket {
+				panic("Invalid parser state!");
+			}
+			next_token(parser);
+
+			return make_array_literal(parser, t, entries);
 		case LeftBrace:
 			next_token(parser);
 			entries: [dynamic]NodeTableLiteralEntry;

@@ -112,6 +112,12 @@ pool_number_constant :: proc(state: ^State, f: ^KoiFunction, v: f64) -> u8 {
 	return u8(k);
 }
 
+gen_number_literal :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, v: f64) {
+	append(&f.ops, Opcode.PUSHK);
+	push_func_stack(f);
+	append(&f.ops, Opcode(pool_number_constant(state, f, v)));
+}
+
 gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 	using Opcode;
 	switch n in node.kind {
@@ -229,6 +235,19 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			pop_func_stack(f);
 			//pop_func_stack(f);
 		}
+	case NodeArrayLiteral:
+		append(&f.ops, NEWARRAY);
+		push_func_stack(f);
+
+		for e, i in n.entries {
+			gen_number_literal(state, scope, f, f64(i));
+			gen_expr(state, scope, f, e);
+			append(&f.ops, SETARRAY);
+			pop_func_stack(f);
+			pop_func_stack(f);
+		}
+
+		//No need to push table as SETARRAY does not pop the array
 	case:
 		panic("Unexpected node type!");
 	}
@@ -335,7 +354,6 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 				fmt.panicf("Invalid assignment op type: %v", n.op);
 			}
 
-			fmt.printf("op: %d, lhs.name: %s, is_local: %v, index: %d\n", len(f.ops), lhs.name, v.is_local, v.local_index);
 			if v.is_local {
 				append(&f.ops, SETLOCAL);
 				pop_func_stack(f);
@@ -581,17 +599,119 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	pop_func_stack(f);
 
 	if true {
-		fmt.printf("\n\nfunc: %s\nops (%d): %#v\n", n.name, len(f.ops), f.ops);
-		fmt.printf("f.arg_count: %v\n", f.arg_count);
-		fmt.printf("f.stack_size: %v\n", f.stack_size);
+		fmt.printf("\nfunction: %s\n", n.name);
+		fmt.printf("arguments: %v\n", f.arg_count);
+		fmt.printf("stack_size: %v\n", f.stack_size);
 		fmt.printf("constants(%v):\n", len(f.constants));
-		if false {
+		if true {
 			for v in f.constants {
+				fmt.printf("  ");
 				print_value(v);
 				fmt.printf("\n");
 			}
 		}
+		fmt.printf("\nops(%d):\n", len(f.ops));
+		pretty_print(f);
+		fmt.printf("\n");
+
 	}
 
+	// free(scope), we dont want to do this, we're wasting space, have a [dynamic]Scope on state
+	// and push, pop to that
 	return fv;
+}
+
+pretty_print :: proc(f: ^KoiFunction) {
+	using Opcode;
+	i := 0;
+	width := 1;
+	sum := len(f.ops);
+	for sum > 0 {
+		sum /= 10;
+		width += 1;
+	}
+
+	for {
+		start := i;
+		if i == len(f.ops) do break;
+		op := f.ops[i];
+		i += 1;
+		switch op {
+		case POP:
+			fmt.printf("% *d: POP\n", width, start);
+		case PUSHK:
+			k := u8(f.ops[i]);
+			i += 1;
+			fmt.printf("% *d: PUSHK %d\n", width, start, k);
+		case PUSHNULL:
+			fmt.printf("% *d: PUSHNULL\n", width, start);
+		case PUSHFALSE:
+			fmt.printf("% *d: PUSHFALSE\n", width, start);
+		case PUSHTRUE:
+			fmt.printf("% *d: PUSHTRUE\n", width, start);
+		case GETLOCAL:
+			l := u8(f.ops[i]);
+			i += 1;
+			fmt.printf("% *d: GETLOCAL %d\n", width, start, l);
+		case SETLOCAL:
+			l := u8(f.ops[i]);
+			i += 1;
+			fmt.printf("% *d: SETLOCAL %d\n", width, start, l);
+		case GETGLOBAL:
+			fmt.printf("% *d: GETGLOBAL\n", width, start);
+		case SETGLOBAL:
+			fmt.printf("% *d: SETGLOBAL\n", width, start);
+		case UNM:
+			fmt.printf("% *d: UNM\n", width, start);
+		case ADD:
+			fmt.printf("% *d: ADD\n", width, start);
+		case SUB:
+			fmt.printf("% *d: SUB\n", width, start);
+		case MUL:
+			fmt.printf("% *d: MUL\n", width, start);
+		case DIV:
+			fmt.printf("% *d: DIV\n", width, start);
+		case MOD:
+			fmt.printf("% *d: MOD\n", width, start);
+		case EQ:
+			fmt.printf("% *d: EQ\n", width, start);
+		case LT:
+			fmt.printf("% *d: LT\n", width, start);
+		case LTE:
+			fmt.printf("% *d: LTE\n", width, start);
+		case GT:
+			fmt.printf("% *d: GT\n", width, start);
+		case GTE:
+			fmt.printf("% *d: GTE\n", width, start);
+		case IFT:
+			fmt.printf("% *d: IFT\n", width, start);
+		case IFF:
+			fmt.printf("% *d: IFF\n", width, start);
+		case JMP:
+			a1 := u16(f.ops[i]); i += 1;
+			a2 := u16(f.ops[i]); i += 1;
+			dist := int(transmute(i16) (a1 << 8 | a2));
+			fmt.printf("% *d: JMP %d\n", width, start, dist);
+		case CALL:
+			fmt.printf("% *d: CALL\n", width, start);
+		case RETURN:
+			fmt.printf("% *d: RETURN\n", width, start);
+		case NEWTABLE:
+			fmt.printf("% *d: NEWTABLE\n", width, start);
+		case SETTABLE:
+			fmt.printf("% *d: SETTABLE\n", width, start);
+		case GETTABLE:
+			fmt.printf("% *d: GETTABLE\n", width, start);
+		case NEWARRAY:
+			fmt.printf("% *d: NEWARRAY\n", width, start);
+		case SETARRAY:
+			fmt.printf("% *d: SETARRAY\n", width, start);
+		case GETARRAY:
+			fmt.printf("% *d: GETARRAY\n", width, start);
+		case PRINT:
+			fmt.printf("% *d: PRINT\n", width, start);
+		case LEN:
+			fmt.printf("% *d: LEN\n", width, start);
+		}
+	}
 }

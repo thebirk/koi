@@ -363,6 +363,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 		}
 	}
 
+	//TODO: if we fall here from a failed multi char we report the character after the failed char!
 	fmt.printf("%s(%d:%d): Invalid character '%r'/%d!\n", loc.file, loc.line, loc.character, r, r);
 	panic("");
 	return Token{TokenType.Eof, "eof", loc};

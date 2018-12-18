@@ -24,7 +24,7 @@ Opcode :: enum u8 {
 	IFT, IFF, JMP,
 	CALL, RETURN,
 	NEWTABLE, SETTABLE, GETTABLE,
-	NEWARRAY,
+	NEWARRAY, SETARRAY, GETARRAY,
 	PRINT, LEN,
 }
 
@@ -375,6 +375,22 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			}
 
 			state.stack[sp] = value; sp += 1;
+		case NEWARRAY:
+			v := new_value(state, Array);
+			state.stack[sp] = v; sp += 1;
+		case SETARRAY:
+			sp -= 1; v := state.stack[sp];
+			sp -= 1; index_v := state.stack[sp];
+			assert(is_number(index_v));
+
+			index := cast(^Number) index_v;
+
+			sp -= 1; array_v := state.stack[sp];
+			assert(is_array(array_v));
+			array := cast(^Array) array_v;
+
+			i := int(index.value);
+			
 		case IFT:
 			// assumes well-formed opcode
 			sp -= 1; val := state.stack[sp];

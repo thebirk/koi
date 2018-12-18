@@ -221,8 +221,7 @@ import_file :: proc(state: ^State, parent: ^Scope, filepath: string, import_into
 }
 
 // Things that aint right
-// - print "test" + 1; Passes throgh the lexer as a statement, this is aint right.
-// - print ""; Empty strings are probably broken
+// 
 
 main :: proc() {
 	//dump_nodes(nodes);
