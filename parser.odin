@@ -767,7 +767,7 @@ parse_top_level :: proc(using parser: ^Parser) -> ^Node {
 	case Eof:
 		return nil;
 	case:
-		parser_error(parser, "Expected 'fn' or 'var', got '%s'", current_token.lexeme);
+		parser_error(parser, "Expected 'import', fn' or 'var', got '%s'", current_token.lexeme);
 		return nil;
 	}
 }

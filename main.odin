@@ -254,6 +254,17 @@ main :: proc() {
 	main := main_v.value;
 
 	if false {
+		fmt.printf("size_of(Null) = %d\n", size_of(Null));
+		fmt.printf("size_of(True) = %d\n", size_of(True));
+		fmt.printf("size_of(False) = %d\n", size_of(False));
+		fmt.printf("size_of(Number) = %d\n", size_of(Number));
+		fmt.printf("size_of(String) = %d\n", size_of(String));
+		fmt.printf("size_of(Function) = %d\n", size_of(Function));
+		fmt.printf("size_of(Array) = %d\n", size_of(Array));
+		fmt.printf("size_of(Table) = %d\n", size_of(Table));
+	}
+
+	if false {
 		mk := (cast(^Function)main).variant.(KoiFunction);
 		out, err := os.open("dump.bin", os.O_RDWR|os.O_CREATE);
 		dump: []u8 = transmute([]u8) mk.ops[:];

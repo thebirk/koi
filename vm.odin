@@ -3,13 +3,6 @@ package koi
 import "core:fmt"
 import "core:math"
 
-// JMP 0 - would be a nop
-// 1: EQ 1  - next instr + 1 if false
-// 2: PUSHTRUE
-// 3: JMP 1 - next instr + 1
-// 4: PUSHFALSE
-// 5: ...
-
 Opcode :: enum u8 {
 	POP,
 	PUSHK,

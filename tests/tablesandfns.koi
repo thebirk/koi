@@ -5,7 +5,7 @@ fn Point(x, y) do return {
 	add = fn(self, p) {
 		self.x += p.x;
 		self.y += p.y;
-		return Point(self.x + p.x, self.y + p.y);
+		return Point(self.x, self.y);
 	},
 
 	pretty = fn(self) {
@@ -16,9 +16,13 @@ fn Point(x, y) do return {
 	}
 };
 
+var test = 123;
+
 fn main(args) {
 	p := Point(32, 16);
 	p.pretty(p);
+
+	test = 2 * 3;
 
 	res := p.add(p, Point(-32, +16));
 	res.pretty(res);
