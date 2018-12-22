@@ -145,12 +145,12 @@ read_token :: proc(parser: ^Parser) -> Token {
 		next_rune(parser);
 		parser.current_line += 1;
 		parser.current_character = 1;
-		return read_token(parser); //WARNING Recursion danger
+		return read_token(parser); //WARNING Recursion
 	}
 
 	if r == ' ' || r == '\t' || r == '\r' {
 		next_rune(parser);
-		return read_token(parser); //WARNING Recursion danger	
+		return read_token(parser); //WARNING Recursion
 	}
 
 	switch r {
@@ -268,6 +268,10 @@ read_token :: proc(parser: ^Parser) -> Token {
 				}
 
 				return read_token(parser);
+			}
+			else if r == '*' {
+				level := 1;
+				
 			}
 			else {
 				return Token{TokenType.Slash, "/", loc};

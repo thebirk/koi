@@ -16,13 +16,45 @@ fn Point(x, y) do return {
 	}
 };
 
-var test = 123;
+// fn checksum(ids) {
+// 	twice_letters := 0;
+// 	thrice_letters := 0;
+
+// 	for id in ids {
+// 		letters := {};
+// 		found_twice_letter := false;
+// 		found_thrice_letter := false;
+
+// 		for c in id {
+// 			if letters[c] != nil {
+// 				letters[c] += 1;
+// 			} else {
+// 				letters[c] = 1;
+// 			}
+// 		}
+
+// 		for k, v in letters {
+// 			if v == 3 {
+// 				if !found_thrice_letter {
+// 					found_thrice_letter = true;
+// 					thrice_letters += 1;
+// 				}
+// 			} 
+// 			else if v == 2 {
+// 				if !found_twice_letter {
+// 					found_twice_letter = true;
+// 					twice_letters += 1;
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	return twice_letters * thrice_letters;
+// }
 
 fn main(args) {
 	p := Point(32, 16);
 	p.pretty(p);
-
-	test = 2 * 3;
 
 	res := p.add(p, Point(-32, +16));
 	res.pretty(res);

@@ -245,6 +245,7 @@ main :: proc() {
 	//import_file(state, state.global_scope, "test_gen.koi", false);
 	//import_file(state, state.global_scope, "tests/gctest.koi", false);
 	import_file(state, state.global_scope, "tests/tablesandfns.koi", false);
+	//import_file(state, state.global_scope, "tests/theslowloopthing.koi", false);
 
 	main_v, ok := scope_get(state.global_scope, "main");
 	if !ok {

@@ -3,6 +3,40 @@ package koi
 import "core:fmt"
 import "core:math"
 
+// POP       = No args
+// PUSHK     = Push constant, A = constant index
+// PUSHNULL  = Push null
+// PUSHFALSE = Push false
+// PUSHTRUE  = Push true
+// GETLOCAL  = Get local, A = local index
+// SETLOCAL  = Set local, A = local index
+// GETGLOBAL = Get global
+// SETGLOBAL = Set global
+// UNM       = Unary minus
+// ADD       = Addition
+// SUB       = Subtraction
+// MUL       = Multiplication
+// DIV       = Division
+// MOD       = Modulo
+// EQ        = Equality test
+// LT        = Less than test
+// LTE       = Less than or equal test
+// GT        = Greater than test
+// GTE       = Greater than or equal test
+// IFT       = Do next instruction if true
+// IFF       = Do next instruction if true
+// JMP       = Relative jmp, A = signed distance
+// CALL      = Call a function
+// RETURN    = Return
+// NEWTABLE  = Push new table to stack
+// SETTABLE  = Set table value
+// GETTABLE  = Get table value
+// NEWARRAY  = Push new array, A = initial size, 0 = empty
+// SETARRAY  = Set array value
+// GETARRAY  = Get array value
+// PRINT     = Print expression
+// LEN       = Push length of argument(on stack)
+
 Opcode :: enum u8 {
 	POP,
 	PUSHK,
@@ -21,7 +55,7 @@ Opcode :: enum u8 {
 	PRINT, LEN,
 }
 
-op_add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_add :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -34,7 +68,7 @@ op_add :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_sub :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_sub :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -47,7 +81,7 @@ op_sub :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_mul :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_mul :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -60,7 +94,7 @@ op_mul :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_div :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_div :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -73,7 +107,7 @@ op_div :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_mod :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -88,7 +122,7 @@ op_mod :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_eq :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_eq :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -104,7 +138,7 @@ op_eq :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_lt :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_lt :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -120,7 +154,7 @@ op_lt :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_lte :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+op_lte :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
@@ -136,7 +170,7 @@ op_lte :: proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-op_unm :: proc(state: ^State, rhs: ^Value) -> ^Value {
+op_unm :: inline proc(state: ^State, rhs: ^Value) -> ^Value {
 	if is_number(rhs) {
 		r := cast(^Number) rhs;
 		result := new_value(state, Number);
@@ -148,7 +182,7 @@ op_unm :: proc(state: ^State, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
-vm_len :: proc(state: ^State, val: ^Value) -> ^Value {
+vm_len :: inline proc(state: ^State, val: ^Value) -> ^Value {
 	res := new_value(state, Number);
 
 	switch val.kind {
@@ -167,7 +201,7 @@ vm_len :: proc(state: ^State, val: ^Value) -> ^Value {
 	return res;
 }
 
-call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
+call_function :: inline proc(state: ^State, func: ^Function, args: []^Value) -> ^Value {
 	sf := push_call(state, func);
 	result: ^Value = nil;
 	#complete switch f in func.variant {
@@ -180,7 +214,7 @@ call_function :: proc(state: ^State, func: ^Function, args: []^Value) -> ^Value 
 	return result;
 }
 
-vm_print_value :: proc(v: ^Value) {
+vm_print_value :: inline proc(v: ^Value) {
 	switch v.kind {
 	case Null: fmt.printf("null");
 	case True: fmt.printf("true");
