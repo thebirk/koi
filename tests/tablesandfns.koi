@@ -53,11 +53,38 @@ fn Point(x, y) do return {
 // }
 
 fn main(args) {
+	a := '€';
+	print a;
+
+	print "";
+	print "Point stuff";
 	p := Point(32, 16);
 	p.pretty(p);
+
+	i := 0;
+	for i < 10 {
+		p.add(p, Point(2, 3));
+
+		i += 1;
+	}
 
 	res := p.add(p, Point(-32, +16));
 	res.pretty(res);
 
 	p.pretty(p);
+
+	get_thing := fn(id, callback) {
+		callback("thing_value");
+	};
+
+	get_thing("someid", fn(value) {
+		print value;
+	});
+
+	print "";
+	i = 0;
+	for i < 1000000 {
+		if i % 100000 == 0 do print i;
+		i += 1;
+	}
 }

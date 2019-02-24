@@ -188,15 +188,15 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		using TokenType;
 		switch n.op {
-		case Plus: append(&f.ops, Opcode(ADD));
-		case Minus: append(&f.ops, Opcode(SUB));
-		case Asterisk: append(&f.ops, Opcode(MUL));
-		case Slash: append(&f.ops, Opcode(DIV));
-		case Mod: append(&f.ops, Opcode(MOD));
-		case Equals: append(&f.ops, Opcode(EQ));
-		case LessThan: append(&f.ops, Opcode(LT));
-		case LessThanOrEqual: append(&f.ops, Opcode(LTE));
-		case GreaterThan: append(&f.ops, Opcode(GT));
+		case Plus:               append(&f.ops, Opcode(ADD));
+		case Minus:              append(&f.ops, Opcode(SUB));
+		case Asterisk:           append(&f.ops, Opcode(MUL));
+		case Slash:              append(&f.ops, Opcode(DIV));
+		case Mod:                append(&f.ops, Opcode(MOD));
+		case Equals:             append(&f.ops, Opcode(EQ));
+		case LessThan:           append(&f.ops, Opcode(LT));
+		case LessThanOrEqual:    append(&f.ops, Opcode(LTE));
+		case GreaterThan:        append(&f.ops, Opcode(GT));
 		case GreaterThanOrEqual: append(&f.ops, Opcode(GTE));
 		case: panic("Unexpected binary op!");
 		}
@@ -499,7 +499,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			case:
 				panic("Invalid else block node type");
 			}
-			free(false_scope);
+			delete_scope(false_scope);
 		}
 
 		false_end_jmp := len(f.ops);
@@ -514,7 +514,7 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 
 		true_scope := make_scope(scope);
 		gen_block(state, true_scope, f, n.block);
-		free(true_scope);
+		delete_scope(true_scope);
 
 		end := len(f.ops);
 		false_end_jmp_dist := transmute(u16) i16(end - false_end_jmp - 3);
@@ -580,6 +580,8 @@ gen_block :: proc(state: ^State, parent_scope: ^Scope, f: ^KoiFunction, node: ^N
 	for stmt in n.stmts {
 		gen_stmt(state, scope, f, stmt);
 	}
+
+	delete_scope(scope);
 }
 
 gen_function_expr :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFnExpr) -> ^Function {
@@ -621,6 +623,8 @@ gen_function_expr :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFnExpr) -
 		fmt.printf("\n");
 
 	}
+
+	delete_scope(scope);
 
 	return fv;
 }
@@ -667,6 +671,8 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 
 	// free(scope), we dont want to do this, we're wasting space, have a [dynamic]Scope on state
 	// and push, pop to that
+	delete_scope(scope);
+	
 	return fv;
 }
 

@@ -2,29 +2,29 @@ package koi
 
 import "core:fmt"
 import "core:sync"
+using import "core:runtime";
 import "shared:birk/arraylist"
 
-GCColor :: enum {
-	White = 0,
-	Grey,
-	Black,
-}
+//GCColor :: enum {
+//	White = 0,
+//	Grey,
+//	Black,
+//}
 
 // TODO: When we send a gcobject out of Koi, we mark is at foreign(aka. dont free me whatsover),
 // when that functions returns, we remove the mark and they return to their normal lives.
-GCObject :: struct {
-	color: GCColor,
-	is_constant: b8,
-	next: ^GCObject,
-	// Used only by GCObjects in the grey of black list
-	next_list: ^GCObject,
-	prev_list: ^GCObject,
-}
+//GCObject :: struct {
+//	color: GCColor,
+//	is_constant: b8,
+//	next: ^GCObject,
+//	// Used only by GCObjects in the grey of black list
+//	next_list: ^GCObject,
+//	prev_list: ^GCObject,
+//}
 
 Value :: struct {
 	using gc: GCObject,
 	kind: typeid,
-	kind_str: string,
 }
 
 Null :: struct { using base: Value }
@@ -78,12 +78,61 @@ is_function :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Function);
 is_array    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Array);
 is_table    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Table);
 
-using import "core:runtime";
 new_value :: proc(state: ^State, $T: typeid, add_to_gc := true) -> ^T {
+	if state.total_values == state.max_values {
+		PRINT :: false;
+		when PRINT {
+			fmt.printf("============================\n");
+			fmt.printf("Before:\n");
+			fmt.printf("    Total: %d\n    Max:   %d\n", state.total_values, state.max_values);
+		}
+		
+		// Do we do this before or after the clean? After would probably be better
+		// because if we do it before the max just keep growing
+		gc_mark_and_sweep(&state.gc, state);
+		state.max_values = 2*state.total_values;
+
+		when PRINT {
+			fmt.printf("After:\n");
+			fmt.printf("    Total: %d\n    Max:   %d\n", state.total_values, state.max_values);
+			fmt.printf("============================\n");
+		}
+	}
+
+	when T == Number {
+		//TODO: Check if we have any numbers pooled
+		// free_value should put Numbers into the Number pool
+		// use a dynamic array as the pool, and use it like a stack
+		n: ^Value;
+
+		if len(state.number_pool) > 0 {
+			n = pop(&state.number_pool);
+		} else {
+			n = new(T);
+			n.kind = typeid_of(T);
+		}
+
+		if add_to_gc {
+			gc_register_object(&state.gc, n);
+			state.total_values += 1;
+		} else {
+			n.is_constant = true;
+		}
+		return cast(^Number) n;
+	}
+
 	val := new(T);
 	val.kind = typeid_of(T);
-	val.kind_str = (type_info_of(T).variant.(Type_Info_Named)).name;
 	
+	if add_to_gc {
+		gc_register_object(&state.gc, val);
+
+		state.total_values += 1;
+	} else {
+		val.is_constant = true;
+	}
+
+	/*
 	if add_to_gc {
 		if state.marking {
 			val.color = GCColor.Grey;
@@ -110,35 +159,48 @@ new_value :: proc(state: ^State, $T: typeid, add_to_gc := true) -> ^T {
 	} else {
 		val.is_constant = true;
 	}
+	*/
 
 	return val;
 }
 
 free_value :: proc(state: ^State, v: ^Value) {
-	state.total_values -= 1;
+	if !v.is_constant do state.total_values -= 1;
+
 	switch v.kind {
-	case True, False, Null, Number:
+	case True, False, Null:
 		// Do nothing
+	case Number:
+		append(&state.number_pool, v);
+		return; // Return so we dont actually free the v pointer
 	case String:
 		s := cast(^String) v;
 		delete(s.str);
 	case Table:
 		t := cast(^Table) v;
+		// We dont need to free each individual entry
+		// as they will be freed themselves
 		if len(t.data) > 0 {
 			delete(t.data);
 		}
 	case Array:
 		arr := cast(^Array) v;
-		panic("TODO: free Array");
+		arraylist.delete(&arr.data);
 	case Function:
-		f := cast(^Function) v;
-		fmt.printf("f: %#v\n", f^);
-		panic("TODO: free Function");
+		ff := cast(^Function) v;
+		//fmt.printf("f: %#v\n", ff^);
+		#complete switch f in ff.variant {
+		case KoiFunction:
+			delete(f.ops);
+			delete(f.constants);
+		}
 	case: panic("Uncomplete free_value case!");
 	}
+
 	free(v);
 }	
 
+/*
 init_marking_phase :: proc(using state: ^State) {
 	sync.mutex_lock(&state.marking_mutex);
 	if marking {
@@ -178,6 +240,7 @@ init_marking_phase :: proc(using state: ^State) {
 	// Kick off worker thread
 	sync.semaphore_release(&state.start_gc_thread);
 }
+*/
 
 print_value :: proc(v: ^Value) {
 	switch v.kind {

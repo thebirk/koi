@@ -1,0 +1,52 @@
+// fn find_prime_iterative(initial) {
+//     prime := 1;
+//     curr := 1;
+//     prime_count := 0;
+
+//     for prime_count < initial {
+//         denom := 2;
+//         for denom < curr {
+//             if curr % denom == 0 {
+//                 curr = curr + 1;
+//             } else {
+//                 denom += 1;
+//             }
+//         }
+//         prime = curr;
+//         curr = curr + 1;
+
+//         if prime_count % 100 == 0 do print prime_count;
+
+//         prime_count = prime_count + 1;
+//     }
+
+//     return prime;
+// }
+
+fn find_prime_iterative(initial) {
+    prime := 1;
+    curr := 1;
+    prime_count := 1;
+
+    for prime_count < initial {
+        denom := 2;
+        for denom < curr {
+            if curr % denom == 0 {
+                curr += 1;
+            } else {
+                denom += 1;
+            }
+        }
+
+        prime = curr;
+        curr += 1;
+        prime_count += 1;
+
+        if prime_count % 100 == 0 do print prime_count;
+    }
+}
+
+fn main(arg) {
+    out := find_prime_iterative(20000);
+    print out;
+}

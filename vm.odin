@@ -112,9 +112,7 @@ op_mod :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
 		result := new_value(state, Number);
-		// panic("mod is broken, pls fix");
-		// result.value = math.mod(l.value, r.value);
-		result.value = l.value - f64(int(l.value / r.value)) * r.value;
+		result.value = math.mod(l.value, r.value);
 		return result;
 	}
 
@@ -169,6 +167,39 @@ op_lte :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 
 	return nil;
 }
+
+op_gt :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result: ^Value = nil;
+		if l.value > r.value {
+			result = state.true_value;
+		} else {
+			result = state.false_value;
+		}
+		return result;
+	}
+
+	return nil;
+}
+
+op_gte :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	if is_number(lhs) && is_number(rhs) {
+		l := cast(^Number) lhs;
+		r := cast(^Number) rhs;
+		result: ^Value = nil;
+		if l.value >= r.value {
+			result = state.true_value;
+		} else {
+			result = state.false_value;
+		}
+		return result;
+	}
+
+	return nil;
+}
+
 
 op_unm :: inline proc(state: ^State, rhs: ^Value) -> ^Value {
 	if is_number(rhs) {
@@ -235,11 +266,314 @@ vm_print_value :: inline proc(v: ^Value) {
 	}
 }
 
+op_funcs: [len(Opcode)]proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool;
+
+vm_init_table :: proc() {
+	op_funcs =  [len(Opcode)]proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool{
+		opcode_pop,
+		opcode_pushk,
+		opcode_pushnull,
+		opcode_pushfalse,
+		opcode_pushtrue,
+		opcode_getlocal,
+		opcode_setlocal,
+		opcode_getglobal,
+		opcode_setglobal,
+		opcode_unm,
+		opcode_add,
+		opcode_sub,
+		opcode_mul,
+		opcode_div,
+		opcode_mod,
+		opcode_eq,
+		opcode_lt,
+		opcode_lte,
+		opcode_gt,
+		opcode_gte,
+		opcode_ift,
+		opcode_iff,
+		opcode_jmp,
+		opcode_call,
+		opcode_return,
+		opcode_newtable,
+		opcode_settable,
+		opcode_gettable,
+		opcode_newarray,
+		opcode_setarray,
+		opcode_getarray,
+		opcode_print,
+		opcode_len,
+	};
+}
+
+opcode_pop       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	assert(sp^ > sf.bottom);
+	sp^ -= 1;
+	return false;
+}
+opcode_pushk     :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	k := func.ops[pc^]; pc^ += 1;
+	state.stack[sp^] = func.constants[k]; sp^ += 1;
+	return false;
+}
+opcode_pushnull  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	state.stack[sp^] = state.null_value; sp^ += 1;
+	return false;
+}
+opcode_pushfalse :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	state.stack[sp^] = state.false_value; sp^ += 1;
+	return false;
+}
+opcode_pushtrue  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	state.stack[sp^] = state.true_value; sp^ += 1;
+	return false;
+}
+opcode_getlocal  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	l := func.ops[pc^]; pc^ += 1;
+	v := state.stack[sf.bottom+int(l)];
+	state.stack[sp^] = v; sp^ += 1;
+	return false;
+}
+opcode_setlocal  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	l := func.ops[pc^]; pc^ += 1;
+	sp^ -= 1; v := state.stack[sp^];
+	state.stack[sf.bottom+int(l)] = v;
+	return false;
+}
+opcode_getglobal :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; s := state.stack[sp^];
+	fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+	name := cast(^String) s;
+
+	v, _ := scope_get(state.global_scope, name.str);
+	state.stack[sp^] = v.value; sp^ += 1;
+	return false;
+}
+opcode_setglobal :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; s := state.stack[sp^];
+	fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+	name := cast(^String) s;
+	v, found := scope_get(state.global_scope, name.str); // Is this really needed?
+	assert(found);
+	sp^ -= 1; value := state.stack[sp^];
+	scope_set(state.global_scope, name.str, value);
+
+	return false;
+}
+opcode_unm       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; v := state.stack[sp^];
+	res := op_unm(state, v);
+	state.stack[sp^] = res; sp^ += 1;
+	return false;
+}
+opcode_add       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_add(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_sub       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_sub(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_mul       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_mul(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_div       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_div(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_mod       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_mod(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_eq        :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_eq(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_lt        :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_lt(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_lte       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_lte(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_gt        :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_gt(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_gte       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; lhs := state.stack[sp^];
+	sp^ -= 1; rhs := state.stack[sp^];
+	r := op_gte(state, lhs, rhs);
+	state.stack[sp^] = r; sp^ += 1;
+	return false;
+}
+opcode_ift       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	// assumes well-formed opcode
+	sp^ -= 1; val := state.stack[sp^];
+	if is_true(val) {
+		return false;
+	} else {
+		pc^ += 3;
+	}
+	return false;
+}
+opcode_iff       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	// assumes well-formed opcode
+	sp^ -= 1; val := state.stack[sp^];
+	if is_false(val) {
+		return false;
+	} else {
+		pc^ += 3;
+	}
+	return false;
+}
+opcode_jmp       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	a1 := u16(func.ops[pc^]); pc^ += 1;
+	a2 := u16(func.ops[pc^]); pc^ += 1;
+	dist := int(transmute(i16) (a1 << 8 | a2));
+	pc^ += dist;
+	return false;
+}
+opcode_call      :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	// Assuming varargs is passed as array.. nah
+	// It would be easier if we created the table here
+
+	// This is safe as the arguments are immeditaly copied out of the array in call_function
+	static args_buffer: [dynamic]^Value;
+
+	sp^ -= 1; f := state.stack[sp^];
+	if !is_function(f) {
+		print_value(f);
+		fmt.printf("\n");
+		fmt.assertf(is_function(f), "Expected Function got %v", f.kind);
+	}
+	fun := cast(^Function) f;
+	clear(&args_buffer);
+	for i in 0..fun.arg_count-1 {
+		sp^ -= 1;
+		append(&args_buffer, state.stack[sp^]);
+	}
+	ret := call_function(state, fun, args_buffer[:]);
+	state.stack[sp^] = ret; sp^ += 1;
+	return false;
+}
+opcode_return    :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	return true;
+}
+opcode_newtable  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	v := new_value(state, Table);
+	state.stack[sp^] = v; sp^ += 1;
+	return false;
+}
+opcode_settable  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; key_v := state.stack[sp^];
+	fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+	key := cast(^String) key_v;
+
+	sp^ -= 1; value := state.stack[sp^];
+
+	sp^ -= 1; table_v := state.stack[sp^];
+	fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+	table := cast(^Table) table_v;
+
+	table.data[key.str] = value;
+
+	state.stack[sp^] = table_v; sp^ += 1; // PUSH table back onto stack
+	return false;
+}
+opcode_gettable  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; key_v := state.stack[sp^];
+	fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+	key := cast(^String) key_v;
+
+	sp^ -= 1; table_v := state.stack[sp^];
+	fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+	table := cast(^Table) table_v;
+
+	//TODO: better error
+	value, found := table.data[key.str];
+	if !found {
+		panic("value not in table, TODO: better error");
+	}
+
+	state.stack[sp^] = value; sp^ += 1;
+
+	return false;
+}
+opcode_newarray  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	v := new_value(state, Array);
+	state.stack[sp^] = v; sp^ += 1;
+	return false;
+}
+opcode_setarray  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; v := state.stack[sp^];
+	sp^ -= 1; index_v := state.stack[sp^];
+	assert(is_number(index_v));
+
+	index := cast(^Number) index_v;
+
+	sp^ -= 1; array_v := state.stack[sp^];
+	assert(is_array(array_v));
+	array := cast(^Array) array_v;
+
+	i := int(index.value);
+	panic("Incomplete");
+
+	return false;
+}
+opcode_getarray  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	panic("incomplete");
+
+	return false;
+}
+opcode_print     :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; v := state.stack[sp^];
+	vm_print_value(v);
+	fmt.printf("\n");
+	return false;
+}
+opcode_len       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	sp^ -= 1; v := state.stack[sp^];
+	res := vm_len(state, v);
+	state.stack[sp^] = res; sp^ += 1;
+	return false;
+}
+
+
 // Pass this a file scope, instead of have it using state.global_scope?
 exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, args: []^Value) -> ^Value {
 	pc := 0;
 	sp := sf.bottom;
-	args_buffer: [dynamic]^Value;
+	args_buffer: [dynamic]^Value; // Can we do without this?
 
 	assert(len(args) == func.arg_count);
 
@@ -256,7 +590,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		//fmt.printf("pc: % 3d, opcode: %v\n", pc, op);
 		pc += 1;
 
-		if false {
+		when false {
 			fmt.printf("stack (%d):\n", func.stack_size);
 			for v in state.stack[sf.bottom+func.locals:sf.bottom+func.locals+func.stack_size] {
 				if v == nil {
@@ -272,6 +606,12 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			}
 		}
 
+		if u16(op) >= len(Opcode) do fmt.panicf("Invalid opcode %2x\n", u8(op));
+
+		if op_funcs[op](state, &pc, &sp, &sf, func) {
+			break vm_loop;
+		}
+/*
 		using Opcode;
 		switch op {
 		case POP:
@@ -421,7 +761,8 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			array := cast(^Array) array_v;
 
 			i := int(index.value);
-			
+		case GETARRAY:
+			panic("dfsdfs");
 		case IFT:
 			// assumes well-formed opcode
 			sp -= 1; val := state.stack[sp];
@@ -453,6 +794,7 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 		case:
 			fmt.panicf("Invalid opcode: %v", op);
 		}
+		*/
 	}
 
 	if false {
@@ -484,6 +826,8 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			}
 		}
 	}
+
+	delete(args_buffer);
 
 	// What do we return? Element at the top of the stack, otherwise nil?
 	// Assumes opcode is wellformed and always returns something

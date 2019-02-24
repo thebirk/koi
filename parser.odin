@@ -18,6 +18,8 @@ Parser :: struct {
 	current_rune: rune,
 	current_rune_offset: int,
 	current_token: Token,
+
+	allocated_strings: [dynamic]string,
 }
 
 init_parser :: proc(parser: ^Parser, filepath: string) -> FileParseError {

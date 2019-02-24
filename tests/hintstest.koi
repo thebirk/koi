@@ -1,0 +1,16 @@
+fn add(x: Number, y: Number) {
+	return x + y;
+}
+
+fn set(self: Array, index: Number, value) {
+	self[index] = value;
+}
+
+fn main(args) {
+	// Should run without isssue
+	print add(5, 4);
+
+	// Should fail, specifying which argument failed, its type hint and the type of the actual paramater
+	// finishes off with a strack trace.
+	print add(false, 99); 
+}

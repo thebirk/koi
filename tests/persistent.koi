@@ -1,0 +1,13 @@
+fn counter() {
+	persist c = -1; // Function local, retains state between calls. Akin to 'static' in other languages like C/C++/Java
+	c += 1;
+	return c;
+}
+
+fn main(args) {
+	print counter();
+	print counter();
+	print counter();
+	print counter();
+	print counter();
+}

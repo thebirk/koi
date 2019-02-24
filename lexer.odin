@@ -313,6 +313,34 @@ read_token :: proc(parser: ^Parser) -> Token {
 			return Token{TokenType.String, lexeme, loc};
 		}
 
+		case '\'': {
+			r = next_rune(parser);
+			start = parser.current_rune_offset;
+
+			//TODO: Handle escapes
+			for {
+				if r == '\'' do break;
+
+				r = next_rune(parser);
+				if r == utf8.RUNE_ERROR do parser_error(parser, Token{loc=loc}, "unexpected end of file while parsing character literal");
+			}
+
+			lexeme := string(parser.data[start:parser.current_rune_offset]);
+			next_rune(parser);
+
+			if utf8.rune_count(cast([]u8)lexeme[:]) > 1 {
+				parser_error(parser, Token{loc=loc}, "invalid character literal, '%s'", lexeme);
+			}
+
+			r, len := utf8.decode_rune_in_string(lexeme);
+			val := f64(r);
+
+			number_lexeme := fmt.aprintf("%d", r);
+			append(&parser.allocated_strings, number_lexeme);
+
+			return Token{TokenType.Number, number_lexeme, loc};
+		}
+
 		case '0'..'9': {
 			found_dot := false;
 

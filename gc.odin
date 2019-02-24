@@ -3,7 +3,7 @@ package koi
 import "core:fmt"
 import "core:sync"
 import "core:thread"
-
+/*
 gc_add_to_grey_from_white :: proc(state: ^State, v: ^Value) {
 	if v.color != GCColor.White do return;
 	v.color = GCColor.Grey;
@@ -39,7 +39,7 @@ gc_mark_value :: proc(state: ^State, v: ^Value) {
 	case Table:
 		t := cast(^Table) v;
 		for _, v in t.data {
-			if v != nil do gc_add_to_grey_from_white(state, v);
+			gc_add_to_grey_from_white(state, v);
 		}
 	case Array:
 		arr := cast(^Array) v;
@@ -108,15 +108,18 @@ gc_worker_proc :: proc(t: ^thread.Thread) -> int {
 		}
 
 		fmt.printf("GC: Freed %d, Values: %d, Max: %d\n", freed_in_pass, state.total_values, state.max_values);
-		state.max_values = state.total_values; // New threshold
+		state.max_values = int(1.25 * f64(state.total_values)); // New threshold
 		//fmt.printf("New Threshold: %d\n", state.max_values);
 
 		b := state.black_list;
 		for b != nil {
+			next := b.next_list;
+
 			b.color = GCColor.White;
 			b.next_list = nil;
 			b.prev_list = nil;
-			b = b.next_list;
+
+			b = next;
 		}
 		state.black_list = nil;
 
@@ -126,3 +129,4 @@ gc_worker_proc :: proc(t: ^thread.Thread) -> int {
 
 	return 0;
 }
+*/
