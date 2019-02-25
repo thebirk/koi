@@ -69,14 +69,14 @@ Table :: struct {
 	data: map[string]^Value,
 }
 
-is_null     :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Null);
-is_true     :: proc(v: ^Value) -> bool do return v.kind == typeid_of(True);
-is_false    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(False);
-is_number   :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Number);
-is_string   :: proc(v: ^Value) -> bool do return v.kind == typeid_of(String);
-is_function :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Function);
-is_array    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Array);
-is_table    :: proc(v: ^Value) -> bool do return v.kind == typeid_of(Table);
+is_null     :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Null);
+is_true     :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(True);
+is_false    :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(False);
+is_number   :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Number);
+is_string   :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(String);
+is_function :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Function);
+is_array    :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Array);
+is_table    :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Table);
 
 new_value :: proc(state: ^State, $T: typeid, add_to_gc := true) -> ^T {
 	if state.total_values == state.max_values {
@@ -89,7 +89,7 @@ new_value :: proc(state: ^State, $T: typeid, add_to_gc := true) -> ^T {
 		
 		// Do we do this before or after the clean? After would probably be better
 		// because if we do it before the max just keep growing
-		gc_mark_and_sweep(&state.gc, state);
+		inline gc_mark_and_sweep(&state.gc, state);
 		state.max_values = 2*state.total_values;
 
 		when PRINT {
@@ -171,7 +171,7 @@ free_value :: proc(state: ^State, v: ^Value) {
 	case True, False, Null:
 		// Do nothing
 	case Number:
-		append(&state.number_pool, v);
+		inline append(&state.number_pool, v);
 		return; // Return so we dont actually free the v pointer
 	case String:
 		s := cast(^String) v;

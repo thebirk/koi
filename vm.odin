@@ -468,7 +468,7 @@ opcode_call      :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, fun
 	// It would be easier if we created the table here
 
 	// This is safe as the arguments are immeditaly copied out of the array in call_function
-	static args_buffer: [dynamic]^Value;
+	@static args_buffer: [dynamic]^Value;
 
 	sp^ -= 1; f := state.stack[sp^];
 	if !is_function(f) {
@@ -608,193 +608,197 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 		if u16(op) >= len(Opcode) do fmt.panicf("Invalid opcode %2x\n", u8(op));
 
+		when true do
 		if op_funcs[op](state, &pc, &sp, &sf, func) {
 			break vm_loop;
 		}
-/*
-		using Opcode;
-		switch op {
-		case POP:
-			assert(sp > sf.bottom);
-			sp -= 1;
-		case PUSHNULL:
-			state.stack[sp] = state.null_value; sp += 1;
-		case PUSHTRUE:
-			state.stack[sp] = state.true_value; sp += 1;
-		case PUSHFALSE:
-			state.stack[sp] = state.false_value; sp += 1;
-		case PUSHK:
-			k := func.ops[pc]; pc += 1;
-			state.stack[sp] = func.constants[k]; sp += 1;
-		case GETLOCAL:
-			l := func.ops[pc]; pc += 1;
-			v := state.stack[sf.bottom+int(l)];
-			state.stack[sp] = v; sp += 1;
-		case SETLOCAL:
-			l := func.ops[pc]; pc += 1;
-			sp -= 1; v := state.stack[sp];
-			state.stack[sf.bottom+int(l)] = v;
-		case GETGLOBAL:
-			sp -= 1; s := state.stack[sp];
-			fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
-			name := cast(^String) s;
 
-			v, _ := scope_get(state.global_scope, name.str);
-			state.stack[sp] = v.value; sp += 1;
-		case SETGLOBAL:
-			sp -= 1; s := state.stack[sp];
-			fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
-			name := cast(^String) s;
-			v, found := scope_get(state.global_scope, name.str); // Is this really needed?
-			assert(found);
-			sp -= 1; value := state.stack[sp];
-			scope_set(state.global_scope, name.str, value);
-		case ADD:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_add(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case SUB:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_sub(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case MUL:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_mul(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case DIV:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_div(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case MOD:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_mod(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case EQ:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_eq(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case LT:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_lt(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case LTE:
-			sp -= 1; lhs := state.stack[sp];
-			sp -= 1; rhs := state.stack[sp];
-			r := op_lte(state, lhs, rhs);
-			state.stack[sp] = r; sp += 1;
-		case CALL:
-			// Assuming varargs is passed as array.. nah
-			// It would be easier if we created the table here
-			sp -= 1; f := state.stack[sp];
-			if !is_function(f) {
-				print_value(f);
-				fmt.printf("\n");
-				fmt.assertf(is_function(f), "Expected Function got %v", f.kind);
-			}
-			fun := cast(^Function) f;
-			clear(&args_buffer);
-			for i in 0..fun.arg_count-1 {
+		ASSERT :: false;
+
+		when false {
+			using Opcode;
+			switch op {
+			case POP:
+				when ASSERT do assert(sp > sf.bottom);
 				sp -= 1;
-				append(&args_buffer, state.stack[sp]);
+			case PUSHNULL:
+				state.stack[sp] = state.null_value; sp += 1;
+			case PUSHTRUE:
+				state.stack[sp] = state.true_value; sp += 1;
+			case PUSHFALSE:
+				state.stack[sp] = state.false_value; sp += 1;
+			case PUSHK:
+				k := func.ops[pc]; pc += 1;
+				state.stack[sp] = func.constants[k]; sp += 1;
+			case GETLOCAL:
+				l := func.ops[pc]; pc += 1;
+				v := state.stack[sf.bottom+int(l)];
+				state.stack[sp] = v; sp += 1;
+			case SETLOCAL:
+				l := func.ops[pc]; pc += 1;
+				sp -= 1; v := state.stack[sp];
+				state.stack[sf.bottom+int(l)] = v;
+			case GETGLOBAL:
+				sp -= 1; s := state.stack[sp];
+				when ASSERT do fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+				name := cast(^String) s;
+
+				v, _ := scope_get(state.global_scope, name.str);
+				state.stack[sp] = v.value; sp += 1;
+			case SETGLOBAL:
+				sp -= 1; s := state.stack[sp];
+				when ASSERT do fmt.assertf(is_string(s), "Expected string value got %v", s.kind);
+				name := cast(^String) s;
+				v, found := scope_get(state.global_scope, name.str); // Is this really needed?
+				when ASSERT do assert(found);
+				sp -= 1; value := state.stack[sp];
+				scope_set(state.global_scope, name.str, value);
+			case ADD:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_add(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case SUB:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_sub(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case MUL:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_mul(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case DIV:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_div(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case MOD:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_mod(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case EQ:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_eq(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case LT:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_lt(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case LTE:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_lte(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case CALL:
+				// Assuming varargs is passed as array.. nah
+				// It would be easier if we created the table here
+				sp -= 1; f := state.stack[sp];
+				if !is_function(f) {
+					print_value(f);
+					fmt.printf("\n");
+					when ASSERT do fmt.assertf(is_function(f), "Expected Function got %v", f.kind);
+				}
+				fun := cast(^Function) f;
+				clear(&args_buffer);
+				for i in 0..fun.arg_count-1 {
+					sp -= 1;
+					append(&args_buffer, state.stack[sp]);
+				}
+				ret := call_function(state, fun, args_buffer[:]);
+				state.stack[sp] = ret; sp += 1;
+			case JMP:
+				a1 := u16(func.ops[pc]); pc += 1;
+				a2 := u16(func.ops[pc]); pc += 1;
+				dist := int(transmute(i16) (a1 << 8 | a2));
+				pc += dist;
+			case RETURN:
+				break vm_loop; // Is it this easy?
+			case NEWTABLE:
+				v := new_value(state, Table);
+				state.stack[sp] = v; sp += 1;
+			case SETTABLE:
+				sp -= 1; key_v := state.stack[sp];
+				when ASSERT do fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+				key := cast(^String) key_v;
+
+				sp -= 1; value := state.stack[sp];
+
+				sp -= 1; table_v := state.stack[sp];
+				when ASSERT do fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+				table := cast(^Table) table_v;
+
+				table.data[key.str] = value;
+
+				state.stack[sp] = table_v; sp += 1; // PUSH table back onto stack
+			case GETTABLE:
+				sp -= 1; key_v := state.stack[sp];
+				when ASSERT do fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
+				key := cast(^String) key_v;
+
+				sp -= 1; table_v := state.stack[sp];
+				when ASSERT do fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
+				table := cast(^Table) table_v;
+
+				//TODO: better error
+				value, found := table.data[key.str];
+				if !found {
+					panic("value not in table, TODO: better error");
+				}
+
+				state.stack[sp] = value; sp += 1;
+			case NEWARRAY:
+				v := new_value(state, Array);
+				state.stack[sp] = v; sp += 1;
+			case SETARRAY:
+				sp -= 1; v := state.stack[sp];
+				sp -= 1; index_v := state.stack[sp];
+				when ASSERT do assert(is_number(index_v));
+
+				index := cast(^Number) index_v;
+
+				sp -= 1; array_v := state.stack[sp];
+				when ASSERT do assert(is_array(array_v));
+				array := cast(^Array) array_v;
+
+				i := int(index.value);
+			case GETARRAY:
+				panic("dfsdfs");
+			case IFT:
+				// assumes well-formed opcode
+				sp -= 1; val := state.stack[sp];
+				if is_true(val) {
+					continue;
+				} else {
+					pc += 3;
+				}
+			case IFF:
+				// assumes well-formed opcode
+				sp -= 1; val := state.stack[sp];
+				if is_false(val) {
+					continue;
+				} else {
+					pc += 3;
+				}
+			case UNM:
+				sp -= 1; v := state.stack[sp];
+				res := op_unm(state, v);
+				state.stack[sp] = res; sp += 1;
+			case PRINT:
+				sp -= 1; v := state.stack[sp];
+				vm_print_value(v);
+				fmt.printf("\n");
+			case LEN:
+				sp -= 1; v := state.stack[sp];
+				res := vm_len(state, v);
+				state.stack[sp] = res; sp += 1;
+			case:
+				fmt.panicf("Invalid opcode: %v", op);
 			}
-			ret := call_function(state, fun, args_buffer[:]);
-			state.stack[sp] = ret; sp += 1;
-		case JMP:
-			a1 := u16(func.ops[pc]); pc += 1;
-			a2 := u16(func.ops[pc]); pc += 1;
-			dist := int(transmute(i16) (a1 << 8 | a2));
-			pc += dist;
-		case RETURN:
-			break vm_loop; // Is it this easy?
-		case NEWTABLE:
-			v := new_value(state, Table);
-			state.stack[sp] = v; sp += 1;
-		case SETTABLE:
-			sp -= 1; key_v := state.stack[sp];
-			fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
-			key := cast(^String) key_v;
-
-			sp -= 1; value := state.stack[sp];
-
-			sp -= 1; table_v := state.stack[sp];
-			fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
-			table := cast(^Table) table_v;
-
-			table.data[key.str] = value;
-
-			state.stack[sp] = table_v; sp += 1; // PUSH table back onto stack
-		case GETTABLE:
-			sp -= 1; key_v := state.stack[sp];
-			fmt.assertf(is_string(key_v), "expected string got %#v", key_v.kind);
-			key := cast(^String) key_v;
-
-			sp -= 1; table_v := state.stack[sp];
-			fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
-			table := cast(^Table) table_v;
-
-			//TODO: better error
-			value, found := table.data[key.str];
-			if !found {
-				panic("value not in table, TODO: better error");
-			}
-
-			state.stack[sp] = value; sp += 1;
-		case NEWARRAY:
-			v := new_value(state, Array);
-			state.stack[sp] = v; sp += 1;
-		case SETARRAY:
-			sp -= 1; v := state.stack[sp];
-			sp -= 1; index_v := state.stack[sp];
-			assert(is_number(index_v));
-
-			index := cast(^Number) index_v;
-
-			sp -= 1; array_v := state.stack[sp];
-			assert(is_array(array_v));
-			array := cast(^Array) array_v;
-
-			i := int(index.value);
-		case GETARRAY:
-			panic("dfsdfs");
-		case IFT:
-			// assumes well-formed opcode
-			sp -= 1; val := state.stack[sp];
-			if is_true(val) {
-				continue;
-			} else {
-				pc += 3;
-			}
-		case IFF:
-			// assumes well-formed opcode
-			sp -= 1; val := state.stack[sp];
-			if is_false(val) {
-				continue;
-			} else {
-				pc += 3;
-			}
-		case UNM:
-			sp -= 1; v := state.stack[sp];
-			res := op_unm(state, v);
-			state.stack[sp] = res; sp += 1;
-		case PRINT:
-			sp -= 1; v := state.stack[sp];
-			vm_print_value(v);
-			fmt.printf("\n");
-		case LEN:
-			sp -= 1; v := state.stack[sp];
-			res := vm_len(state, v);
-			state.stack[sp] = res; sp += 1;
-		case:
-			fmt.panicf("Invalid opcode: %v", op);
 		}
-		*/
 	}
 
 	if false {

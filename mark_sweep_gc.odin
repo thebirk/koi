@@ -15,7 +15,7 @@ GCObject :: struct {
 	marked: b8,
 }
 
-gc_register_object :: proc(state: ^GCState, v: ^GCObject) {
+gc_register_object :: inline proc(state: ^GCState, v: ^GCObject) {
 	v.next = state.all_objects;
 	state.all_objects = v;
 }

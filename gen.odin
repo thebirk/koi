@@ -651,7 +651,7 @@ gen_function :: proc(state: ^State, parent_scope: ^Scope, n: ^NodeFn) -> ^Functi
 	append(&f.ops, Opcode(Opcode.RETURN));
 	pop_func_stack(f);
 
-	if true {
+	when true {
 		fmt.printf("\nfunction: %s\n", n.name);
 		fmt.printf("arguments: %v\n", f.arg_count);
 		fmt.printf("stack_size: %v\n", f.stack_size);

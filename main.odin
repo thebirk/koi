@@ -63,7 +63,7 @@ State :: struct {
 //	marking_mutex: sync.Mutex,
 //	gc_thread: ^thread.Thread,
 //	start_gc_thread: sync.Semaphore,
-	total_values,max_values: int,
+	total_values, max_values: int,
 
 	number_pool: [dynamic]^Value,
 
@@ -118,7 +118,7 @@ make_state :: proc() -> ^State {
 
 
 	state.total_values = 0;
-	state.max_values = 1000;
+	state.max_values = 100;
 
 	state.userdata_counter = 1;
 
@@ -333,8 +333,9 @@ main :: proc() {
 	//import_file(state, state.global_scope, "tests/gctest.koi", false);
 	
 	t1 := time.now();
-	import_file(state, state.global_scope, "tests/tablesandfns.koi", false);
+	//import_file(state, state.global_scope, "tests/tablesandfns.koi", false);
 	//import_file(state, state.global_scope, "tests/theslowloopthing.koi", false);
+	import_file(state, state.global_scope, "tests/loop.koi", false);
 	t2 := time.now();
 	fmt.printf("%vms\n", time.diff(t1, t2) / time.Millisecond);
 	
@@ -346,7 +347,7 @@ main :: proc() {
 	}
 	main := main_v.value;
 
-	if true {
+	if false {
 		fmt.printf("size_of(Null)     = %d\n", size_of(Null));
 		fmt.printf("size_of(True)     = %d\n", size_of(True));
 		fmt.printf("size_of(False)    = %d\n", size_of(False));
