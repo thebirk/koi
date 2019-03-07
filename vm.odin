@@ -1,7 +1,64 @@
 package koi
 
+import "core:os"
 import "core:fmt"
 import "core:math"
+
+/*
+32-bit
+
+8 + 24
+O   D
+
+8 + 24 | 32
+O   d    d
+
+If a 's' is appended to the operand name the numner is treated as signed (two's complement)
+
+Arguments are pushed from right to left
+TOS = value on top of stack
+TOS(type) = asserts that TOS is of type 'type'
+
+POP        | D  | Pop A elements
+DUP        | D  | Dupliate TOS A times
+PUSHK      | D  | Push constant A to the stack
+PUSHNULL   |    | Push null to the stack
+PUSHFALSE  |    | Push false to the stack
+PUSHTRUE   |    | Push true to the stack
+GETLOCAL   | D  | Push local A onto the stack
+SETLOCAL   | D  | Pop the stack and store in local A
+GETGLOBAL  |    | Pop TOS(string) and push the result
+SETGLOBAL  |    | Pop TOS(string) and store new TOS there
+UNM        |    | -TOS
+NOT        |    | !NOT
+ADD        |    | TOS + TOS
+SUB        |    | TOS - TOS
+MUL        |    | TOS * TOS
+DIV        |    | TOS / TOS
+MOD        |    | TOS % TOD
+EQ         |    | TOS == TOS
+LT         |    | TOS < TOS
+LTE        |    | TOS <= TOS
+JMP        | Ds | Relative jump Ds
+LONGJMP    | ds | ^
+IFT        | Ds | If TOS is true relative jump Ds
+LONGIFT    | ds | ^
+IFF        | Ds | If TOS is false relative jump Ds
+LONGIFF    | ds | ^
+CALL       |    | Call TOS(function)
+SELF       |    | T = TOS, 
+RETURN     |    | Return from function
+NEWTABLE   |    | Push a new table to the stack
+SETTABLE   | D  | For D pairs of (Value, String), set TOS[String] = Value for all
+GETTABLE   |    | T = TOS, push T[TOS(string)]
+NEWARRAY   | D  | Push a new array of size D to the stack
+SETARRAY   | D  | For D pairs of (Value, Number), set TOS[Number] = Value for all
+GETARRAY   |    | T = TOS, push T[TOS(number)]
+PRINT      |    | Print TOS
+LEN        |    | Push length of TOS, nil if TOS has no length
+
+
+*/
 
 // POP       = No args
 // PUSHK     = Push constant, A = constant index
@@ -36,6 +93,8 @@ import "core:math"
 // GETARRAY  = Get array value
 // PRINT     = Print expression
 // LEN       = Push length of argument(on stack)
+// NOT       = Logical not
+// DUP       = Duplicates the top value
 
 Opcode :: enum u8 {
 	POP,
@@ -53,6 +112,7 @@ Opcode :: enum u8 {
 	NEWTABLE, SETTABLE, GETTABLE,
 	NEWARRAY, SETARRAY, GETARRAY,
 	PRINT, LEN,
+	NOT, DUP
 }
 
 op_add :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
@@ -108,11 +168,25 @@ op_div :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
 }
 
 op_mod :: inline proc(state: ^State, lhs, rhs: ^Value) -> ^Value {
+	foreign _ {
+		@(link_name="llvm.copysign.f64")
+		copysign :: proc"c"(x, y: f64) -> f64 ---;
+	}
+	mod_f64 :: inline proc(x, y: f64) -> f64 {
+		result: f64;
+		y = abs(y);
+		result = inline math.remainder(abs(x), y);
+		if inline math.sign(result) < 0 {
+			result += y;
+		}
+		return copysign(result, x);
+	}
+	
 	if is_number(lhs) && is_number(rhs) {
 		l := cast(^Number) lhs;
 		r := cast(^Number) rhs;
 		result := new_value(state, Number);
-		result.value = math.mod(l.value, r.value);
+		result.value = inline math.remainder(l.value, r.value);
 		return result;
 	}
 
@@ -213,6 +287,14 @@ op_unm :: inline proc(state: ^State, rhs: ^Value) -> ^Value {
 	return nil;
 }
 
+op_not :: inline proc(state: ^State, rhs: ^Value) -> ^Value {
+	if is_false(rhs) {
+		return state.true_value;
+	} else {
+		return state.false_value;
+	}
+}
+
 vm_len :: inline proc(state: ^State, val: ^Value) -> ^Value {
 	res := new_value(state, Number);
 
@@ -245,17 +327,23 @@ call_function :: inline proc(state: ^State, func: ^Function, args: []^Value) -> 
 	return result;
 }
 
+import "core:strconv"
 vm_print_value :: inline proc(v: ^Value) {
 	switch v.kind {
-	case Null: fmt.printf("null");
+	case Nil: fmt.printf("nil");
 	case True: fmt.printf("true");
 	case False: fmt.printf("false");
 	case Number:
 		n := cast(^Number) v;
-		fmt.printf("%f", n.value);
+		//fmt.printf("%f", n.value);
+		buffer: [64]u8;
+		strconv.generic_ftoa(buffer[:], n.value, 'f', 0, 64);
+		fmt.printf("%s", string(buffer[:]));
 	case String:
 		s := cast(^String) v;
-		fmt.printf("%s", s.str);
+		//fmt.printf("%s", s.str);
+		//TODO: Have outstream be a variable
+		os.write(os.stdout, cast([]u8) s.str[:]);
 	case Table:
 		fmt.printf("[table @ %p]", v);
 	case Array:
@@ -267,6 +355,11 @@ vm_print_value :: inline proc(v: ^Value) {
 }
 
 op_funcs: [len(Opcode)]proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool;
+
+opcode_stub :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool {
+	panic("STUB OPCODE");
+	return false;
+}
 
 vm_init_table :: proc() {
 	op_funcs =  [len(Opcode)]proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool{
@@ -303,6 +396,8 @@ vm_init_table :: proc() {
 		opcode_getarray,
 		opcode_print,
 		opcode_len,
+		opcode_not,
+		opcode_stub, // DUP
 	};
 }
 
@@ -501,6 +596,7 @@ opcode_settable  :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, fun
 
 	sp^ -= 1; value := state.stack[sp^];
 
+	//TODO: We don't actually have to pop the table, we can just read it as is
 	sp^ -= 1; table_v := state.stack[sp^];
 	fmt.assertf(is_table(table_v), "expected table got %v", table_v.kind);
 	table := cast(^Table) table_v;
@@ -568,6 +664,12 @@ opcode_len       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, fun
 	return false;
 }
 
+opcode_not       :: proc(state: ^State, pc: ^int, sp: ^int, sf: ^StackFrame, func: ^KoiFunction) -> bool{
+	sp^ -= 1; v := state.stack[sp^];
+	res := op_not(state, v);
+	state.stack[sp^] = res; sp^ += 1;
+	return false;
+}
 
 // Pass this a file scope, instead of have it using state.global_scope?
 exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, args: []^Value) -> ^Value {
@@ -608,14 +710,14 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 
 		if u16(op) >= len(Opcode) do fmt.panicf("Invalid opcode %2x\n", u8(op));
 
-		when true do
+		when false do
 		if op_funcs[op](state, &pc, &sp, &sf, func) {
 			break vm_loop;
 		}
 
 		ASSERT :: false;
 
-		when false {
+		when true {
 			using Opcode;
 			switch op {
 			case POP:
@@ -692,6 +794,16 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 				sp -= 1; lhs := state.stack[sp];
 				sp -= 1; rhs := state.stack[sp];
 				r := op_lte(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case GT:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_gt(state, lhs, rhs);
+				state.stack[sp] = r; sp += 1;
+			case GTE:
+				sp -= 1; lhs := state.stack[sp];
+				sp -= 1; rhs := state.stack[sp];
+				r := op_gte(state, lhs, rhs);
 				state.stack[sp] = r; sp += 1;
 			case CALL:
 				// Assuming varargs is passed as array.. nah
@@ -790,11 +902,18 @@ exec_koi_function :: proc(state: ^State, func: ^KoiFunction, sf: StackFrame, arg
 			case PRINT:
 				sp -= 1; v := state.stack[sp];
 				vm_print_value(v);
-				fmt.printf("\n");
+				// fmt.printf("\n");
 			case LEN:
 				sp -= 1; v := state.stack[sp];
 				res := vm_len(state, v);
 				state.stack[sp] = res; sp += 1;
+			case NOT:
+				sp -= 1; v := state.stack[sp];
+				res := op_not(state, v);
+				state.stack[sp] = res; sp += 1;
+			case DUP:
+				v := state.stack[sp-1];
+				state.stack[sp] = v; sp += 1;
 			case:
 				fmt.panicf("Invalid opcode: %v", op);
 			}

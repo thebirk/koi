@@ -1,4 +1,4 @@
-fn Point(x, y) do return {x = x, y = y, add = Point_Add};
+fn Point(x, y) do return {x = x, y = y, add = fn(self, x, y) {self.x += x; self.y += y;}};
 fn Point_Add(self, x, y) {
 	self.x += x;
 	self.y += y;

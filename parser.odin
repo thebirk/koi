@@ -59,8 +59,8 @@ next_token :: proc(using parser: ^Parser) -> Token {
 	return t;
 }
 
-parser_error_at :: proc(using parser: ^Parser, loc: Token, fmt_string: string, args: ..any) -> ! {
-	print_location(loc.loc);
+parser_error_at :: proc(using parser: ^Parser, loc: Location, fmt_string: string, args: ..any) -> ! {
+	print_location(loc);
 	fmt.printf("\e[91m parser error: \e[0m");
 	fmt.printf(fmt_string, ..args);
 	fmt.printf("\n");
@@ -73,7 +73,7 @@ parser_error_at :: proc(using parser: ^Parser, loc: Token, fmt_string: string, a
 }
 
 parser_error_current :: proc(using parser: ^Parser, fmt_string: string, args: ..any) -> ! {
-	parser_error_at(parser, current_token, fmt_string, ..args);
+	parser_error_at(parser, current_token.loc, fmt_string, ..args);
 }
 
 parser_error :: proc{
@@ -99,7 +99,7 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 		case False:
 			next_token(parser);
 			return make_false(parser, t);
-		case Null:
+		case Nil:
 			next_token(parser);
 			return make_null(parser, t);
 		case String:
@@ -245,7 +245,7 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 					name = newname;
 				case NodeString: // Do nothing
 				case:
-					parser_error(parser, name_loc, "invalid table key");
+					parser_error(parser, name_loc.loc, "invalid table key");
 				}
 
 				if current_token.kind != Equal {
@@ -272,7 +272,7 @@ parse_operand :: proc(using parser: ^Parser) -> ^Node {
 
 			return make_table_literal(parser, t, entries);
 		case:
-			parser_error(parser, t, "Expected expression, got '%s'", current_token.lexeme);
+			parser_error(parser, t.loc, "Expected expression, got '%s'", current_token.lexeme);
 	}
 
 	return nil;
@@ -282,7 +282,7 @@ parse_base :: proc(using parser: ^Parser) -> ^Node {
 	expr := parse_operand(parser);
 
 	using TokenType;
-	for (current_token.kind in TokenTypes{LeftPar, LeftBracket, Dot}) {
+	for (current_token.kind in TokenTypes{LeftPar, LeftBracket, Dot, Colon}) {
 		op := current_token;
 		next_token(parser);
 
@@ -301,6 +301,40 @@ parse_base :: proc(using parser: ^Parser) -> ^Node {
 			}
 			next_token(parser);
 			expr = make_field(parser, op, expr, ident);
+		case Colon:
+			ident := current_token;
+			if current_token.kind != TokenType.Ident {
+				parser_error(parser, "Expected identifier after ':', got '%s'", current_token.lexeme);
+			}
+			next_token(parser);
+
+			if current_token.kind != TokenType.LeftPar {
+				parser_error(parser, "Expected '(' while parsing self call, got '%s'", current_token.lexeme);
+			}
+			next_token(parser);
+
+			field := make_field(parser, op, expr, ident);
+
+			args: [dynamic]^Node;
+			for {
+				if current_token.kind == RightPar do break;
+
+				if current_token.kind == Comma {
+					next_token(parser);
+					if current_token.kind == RightPar {
+						parser_error(parser, "Expected another argument after ',', got '%s'", current_token.lexeme);
+					}
+					append(&args, parse_expr(parser));
+				} else {
+					append(&args, parse_expr(parser));
+				}
+			}
+			if current_token.kind != RightPar {
+				panic("Invalid parser state!");
+			}
+			next_token(parser);
+
+			expr = make_selfcall(parser, op, field, args);
 		case LeftPar:
 			args: [dynamic]^Node;
 			for {
@@ -321,7 +355,7 @@ parse_base :: proc(using parser: ^Parser) -> ^Node {
 			}
 			next_token(parser);
 
-			return make_call(parser, op, expr, args);
+			expr = make_call(parser, op, expr, args);
 		case:
 			panic("Unsynced for and switch!");
 		}
@@ -626,14 +660,35 @@ parse_print :: proc(using parser: ^Parser) -> ^Node {
 	assert(loc.kind == TokenType.Print);
 	next_token(parser);
 
+	args: [dynamic]^Node;
 	expr := parse_expr(parser);
+	append(&args, expr);
 
-	if current_token.kind != TokenType.SemiColon {
+	using TokenType;
+	if current_token.kind == Comma {
+		next_token(parser);
+		
+		for {
+			if current_token.kind == SemiColon do break;
+
+			if current_token.kind == Comma {
+				next_token(parser);
+				if current_token.kind == RightPar {
+					parser_error(parser, "Expected another argument after ',', got '%s'", current_token.lexeme);
+				}
+				append(&args, parse_expr(parser));
+			} else {
+				append(&args, parse_expr(parser));
+			}
+		}
+	}
+
+	if current_token.kind != SemiColon {
 		parser_error(parser, "Expected ';', got '%s'", current_token.lexeme);
 	}
 	next_token(parser);
 
-	return make_print(parser, loc, expr);
+	return make_print(parser, loc, args);
 }
 
 parse_stmt :: proc(using parser: ^Parser) -> ^Node {
@@ -663,7 +718,7 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 
 			name, ok := expr.kind.(NodeIdent); 
 			if !ok {
-				parser_error(parser, loc, "Variable name is not an identifier.");
+				parser_error(parser, loc.loc, "Variable name is not an identifier.");
 			}
 
 			rhs := parse_expr(parser);
@@ -691,9 +746,8 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 			return assign;
 		}
 
-		using TokenType;
 		switch n in expr.kind {
-			case NodeCall:
+			case NodeCall, NodeSelfCall:
 				if current_token.kind != TokenType.SemiColon {
 					parser_error(parser, "Expected ';' after statement, got '%s'", current_token.lexeme);
 				}
@@ -702,7 +756,7 @@ parse_stmt :: proc(using parser: ^Parser) -> ^Node {
 		}
 
 		//parser_error(parser, loc, "Expression is not allowed at statement level.");
-		parser_error(parser, loc, "Expected statement, got '%s'", loc.lexeme);
+		parser_error(parser, loc.loc, "Expected statement, got '%s'", loc.lexeme);
 		return nil;
 	}
 	}

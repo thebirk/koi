@@ -27,7 +27,7 @@ Value :: struct {
 	kind: typeid,
 }
 
-Null :: struct { using base: Value }
+Nil :: struct { using base: Value }
 True :: struct { using base: Value }
 False :: struct { using base: Value }
 
@@ -69,7 +69,7 @@ Table :: struct {
 	data: map[string]^Value,
 }
 
-is_null     :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Null);
+is_nil      :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Nil);
 is_true     :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(True);
 is_false    :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(False);
 is_number   :: inline proc(v: ^Value) -> bool do return v.kind == typeid_of(Number);
@@ -168,7 +168,7 @@ free_value :: proc(state: ^State, v: ^Value) {
 	if !v.is_constant do state.total_values -= 1;
 
 	switch v.kind {
-	case True, False, Null:
+	case True, False, Nil:
 		// Do nothing
 	case Number:
 		inline append(&state.number_pool, v);
@@ -246,13 +246,13 @@ print_value :: proc(v: ^Value) {
 	switch v.kind {
 	case True: fmt.printf("True");
 	case False: fmt.printf("False");
-	case Null: fmt.printf("Null");
+	case Nil: fmt.printf("Null");
 	case Number:
 		n := cast(^Number) v;
 		fmt.printf("Number: %f", n.value);
 	case String:
 		str := cast(^String) v;
-		fmt.printf("String: \"%s\"", str.str);
+		fmt.printf("String: %q", str.str);
 	case Function: fmt.printf("Function");
 	case Table:
 		t := cast(^Table) v;

@@ -210,6 +210,9 @@ gen_expr :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 			append(&f.ops, UNM);
 		case TokenType.Plus:
 			gen_expr(state, scope, f, n.expr);
+		case TokenType.LogicalNot:
+			gen_expr(state, scope, f, n.expr);
+			append(&f.ops, NOT);
 		case:
 			panic("Invalid unary operator!");
 		}
@@ -306,10 +309,26 @@ gen_stmt :: proc(state: ^State, scope: ^Scope, f: ^KoiFunction, node: ^Node) {
 		gen_call(state, scope, f, cast(^NodeCall) node);
 		append(&f.ops, POP);
 		pop_func_stack(f);
-	case NodePrint:
+	case NodeSelfCall:
+		for i := len(n.args)-1; i >= 0; i -= 1 {
+			gen_expr(state, scope, f, n.args[i]);
+		}
+		// Push 'expr:' as first argument
+		gen_expr(state, scope, f, n.expr.kind.(NodeField).expr);
 		gen_expr(state, scope, f, n.expr);
-		append(&f.ops, PRINT);
-		pop_func_stack(f);
+		append(&f.ops, CALL);
+		push_func_stack(f);
+	case NodePrint:
+		assert(len(n.args) > 0);
+
+		// This wastes some stack space, but I think this is a little neater
+		for i := len(n.args)-1; i >= 0; i -= 1 {
+			gen_expr(state, scope, f, n.args[i]);
+		}
+		for i in 0..len(n.args)-1 {
+			append(&f.ops, PRINT);
+			pop_func_stack(f);
+		}
 	case NodeAssignment:
 		switch lhs in n.lhs.kind {
 		case NodeIdent:

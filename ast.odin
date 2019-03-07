@@ -137,7 +137,7 @@ NodeArrayLiteral :: struct {
 
 NodePrint :: struct {
 	using node: Node,
-	expr: ^Node,
+	args: [dynamic]^Node,
 }
 
 NodeLen :: struct {
@@ -150,6 +150,12 @@ NodeFnExpr :: struct {
 	args: [dynamic]string,
 	last_is_vararg: bool,
 	block: ^Node,
+}
+
+NodeSelfCall :: struct {
+	using node: Node,
+	expr: ^Node,
+	args: [dynamic]^Node,
 }
 
 new_node :: proc(parser: ^Parser, $T: typeid) -> ^T {
@@ -175,14 +181,16 @@ make_number :: proc(parser: ^Parser, t: Token) -> ^NodeNumber {
 make_string :: proc(parser: ^Parser, t: Token) -> ^NodeString {
 	n := new_node(parser, NodeString);
 	n.loc = t.loc;
-	n.value = strings.new_string(t.lexeme);
+	//n.value = strings.new_string(t.lexeme);
+	n.value = unquote_string(parser, t.loc, t.lexeme);
 	return n;
 }
 
 make_string_from_string :: proc(parser: ^Parser, t: Token, str: string) -> ^NodeString {
 	n := new_node(parser, NodeString);
 	n.loc = t.loc;
-	n.value = str;
+	// n.value = str;
+	n.value = unquote_string(parser, t.loc, str);
 	return n;
 }
 
@@ -333,10 +341,10 @@ make_array_literal :: proc(parser: ^Parser, t: Token, entries: [dynamic]^Node) -
 	return n;	
 }
 
-make_print :: proc(parser: ^Parser, t: Token, expr: ^Node) -> ^NodePrint {
+make_print :: proc(parser: ^Parser, t: Token, args: [dynamic]^Node) -> ^NodePrint {
 	n := new_node(parser, NodePrint);
 	n.loc = t.loc;
-	n.expr = expr;
+	n.args = args;
 	return n;
 }
 
@@ -354,6 +362,14 @@ make_fn_expr :: proc(parser: ^Parser, t: Token, args: [dynamic]string, last_is_v
 	n.last_is_vararg = last_is_vararg;
 	n.block = block;
 	return n;	
+}
+
+make_selfcall :: proc(parser: ^Parser, t: Token, field: ^Node, args:[dynamic]^Node) -> ^NodeSelfCall {
+	n := new_node(parser, NodeSelfCall);
+	n.loc = t.loc;
+	n.expr = field;
+	n.args = args;
+	return n;
 }
 
 make_null :: proc(parser: ^Parser, t: Token) -> ^NodeNull {

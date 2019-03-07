@@ -1,0 +1,8 @@
+fn main(args) {
+	t := {value = 0, add = fn(self, v) {self.value += v;}};
+	print t.value, "\n";
+	t.add(t, 123);
+	print t.value, "\n";
+	//t:add(321);
+	print t.value, "\n";
+}

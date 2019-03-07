@@ -1,6 +1,7 @@
 package koi
 
 import "core:fmt"
+import "core:strings"
 import "core:unicode/utf8"
 import "shared:utf8proc"
 
@@ -26,9 +27,10 @@ TokenType :: enum {
 	String,
 	True,
 	False,
-	Null,
+	Nil,
 	SemiColon,
 	Dot,
+	Colon,
 	Comma,
 	Vararg,
 	LeftPar,
@@ -134,6 +136,46 @@ is_ident :: proc(r: rune) -> bool {
 		|| r == '_';
 }
 
+unquote_string :: proc(parser: ^Parser, loc: Location, str: string) -> string {
+	// Should probably return a bool telling whether or not we allocated a new string
+
+	found := false;
+	for i := 0; i < len(str); i += 1 {
+		// We could get the correct size here
+		if str[i] == '\\' {
+			found = true;
+			break;
+		}
+	}
+
+	if !found do return str;
+
+	buffer: [dynamic]u8;
+	reserve(&buffer, len(str));
+
+	for i := 0; i < len(str); i += 1 {
+		if str[i] == '\\' {
+			i += 1;
+			switch str[i] {
+			case '\\': append(&buffer, '\\');
+			case 'n': append(&buffer, 0x0A);
+			case 'r': append(&buffer, 0x0D);
+			case 'e': append(&buffer, 0x1b);
+			case 't': append(&buffer, 0x09);
+			case '0': append(&buffer, 0);
+			case '"': append(&buffer, '"');
+			case 'x': panic("TODO: Implement byte escape");
+			case:
+				parser_error(parser, loc, "unknown escape sequence '\\%r'", str[i]);
+			}
+		} else {
+			append(&buffer, str[i]);
+		}
+	}
+
+	return string(buffer[:]);
+}
+
 read_token :: proc(parser: ^Parser) -> Token {
 	loc := SourceLoc{parser.filepath, parser.current_line, parser.current_character};
 
@@ -215,7 +257,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 				next_rune(parser);
 				return Token{TokenType.Becomes, ":=", loc};
 			} else {
-				// Fall down to invalid character	
+				return Token{TokenType.Colon, ":", loc};
 			}
 		}
 		case '=': {
@@ -305,7 +347,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 				if r == '"' do break;
 
 				r = next_rune(parser);
-				if r == utf8.RUNE_ERROR do parser_error(parser, Token{loc=loc}, "unexpected end of file while parsing string");
+				if r == utf8.RUNE_ERROR do parser_error(parser, loc, "unexpected end of file while parsing string");
 			}
 
 			lexeme := string(parser.data[start:parser.current_rune_offset]);
@@ -322,14 +364,14 @@ read_token :: proc(parser: ^Parser) -> Token {
 				if r == '\'' do break;
 
 				r = next_rune(parser);
-				if r == utf8.RUNE_ERROR do parser_error(parser, Token{loc=loc}, "unexpected end of file while parsing character literal");
+				if r == utf8.RUNE_ERROR do parser_error(parser, loc, "unexpected end of file while parsing character literal");
 			}
 
 			lexeme := string(parser.data[start:parser.current_rune_offset]);
 			next_rune(parser);
 
 			if utf8.rune_count(cast([]u8)lexeme[:]) > 1 {
-				parser_error(parser, Token{loc=loc}, "invalid character literal, '%s'", lexeme);
+				parser_error(parser, loc, "invalid character literal, '%s'", lexeme);
 			}
 
 			r, len := utf8.decode_rune_in_string(lexeme);
@@ -375,7 +417,7 @@ read_token :: proc(parser: ^Parser) -> Token {
 					case "var"      : token_type = TokenType.Var;
 					case "if"       : token_type = TokenType.If;
 					case "true"     : token_type = TokenType.True;
-					case "null"     : token_type = TokenType.Null;
+					case "nil"      : token_type = TokenType.Nil;
 					case "print"    : token_type = TokenType.Print;
 					case "len"      : token_type = TokenType.Len;
 					case "in"       : token_type = TokenType.In;

@@ -60,10 +60,12 @@ fn main(args) {
 	print "Point stuff";
 	p := Point(32, 16);
 	p.pretty(p);
+	// p:pretty();
 
 	i := 0;
 	for i < 10 {
 		p.add(p, Point(2, 3));
+		// p:add(Point(2, 3));
 
 		i += 1;
 	}

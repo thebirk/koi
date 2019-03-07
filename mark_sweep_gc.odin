@@ -26,7 +26,7 @@ gc_mark_value :: proc(gc: ^GCState, v: ^Value) {
 	v.marked = true;
 
 	switch v.kind {
-	case True, False, Null, String, Number:
+	case True, False, Nil, String, Number:
 		// No children to add
 	case Function:
 		f := cast(^Function) v;
@@ -59,6 +59,10 @@ gc_mark_and_sweep :: proc(gc: ^GCState, state: ^State) {
 
 	for _, v in state.global_scope.names {
 		gc_mark_value(gc, v.value);
+	}
+
+	for _, v in state.loaded_modules {
+		gc_mark_value(gc, v);
 	}
 
 	//TODO: Free excess Numbers stored in number_pool
