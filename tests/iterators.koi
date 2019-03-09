@@ -1,0 +1,92 @@
+fn range(..args) {
+	l := len(args);
+	if l == 1 {
+		length := args[0];
+		i := 0;
+		return fn() {
+			if i > length do return nil;
+			i += 1;
+			return i-1;
+		};
+	} else if l == 2 {
+		start := args[0];
+		end := args[1];
+		i := start;
+		return fn() {
+			if i > end do return nil;
+			i += 1;
+			return i-1;
+		};
+	} else if l == 3 {
+		start := args[0];
+		step := args[2];
+		end := args[1];
+		i := start;
+		return fn() {
+			if i > end do return nil;
+			i += step;
+			return i-step;
+		};
+	} else {
+		return nil;
+	}
+}
+
+fn array_iterator(arr) {
+	i := 0;
+	return fn() {
+		if i >= len(arr) do return nil;
+		
+		result := arr[i];
+		i += 1;
+		
+		return result;
+	}
+}
+
+fn table_iterator(tab) {
+	i := 0;
+	return fn() {
+		if i >= len(tab) do return nil;
+		res, k := indextable(tab, i);
+		return i, v;
+	}
+}
+
+
+for k,v in table:iter() {
+
+}
+
+for k in table_iterator({"Hello", "World"}) {
+
+}
+
+fn println(..args) {
+	i := 0;
+	for i < len(args) {
+		print args[i];
+		i += 1;
+	}
+	for v in iterator() {
+
+	}
+
+	var k, v, a = 1, returns_two();
+	// if returns_two lies and only returns one value, a is set to nil
+
+
+
+	// PUSHNULL
+	// SETLOCAL k
+	// PUSHNULL
+	// SETLOCAL v
+	// GETGLOBAL table
+	// CALL 2
+	// SETLOCAL v
+	// SETLOCAL k
+	for k, v in table() {
+
+	}
+	print "\n";
+}
